@@ -2,7 +2,7 @@
 
 A trust graph intelligence system that models reputation using weighted attestations, multi-hop propagation, and AI-based analysis. It combines a Telegram bot interface with a web-based visualization layer to explore how trust flows across entities.
 
-⸻
+
 
 ## 🚀 Overview
 
@@ -18,7 +18,7 @@ The system then computes:
 
 It also uses AI to explain why an entity is trusted or risky.
 
-⸻
+
 
 ## 🧩 Key Features
 
@@ -27,21 +27,21 @@ It also uses AI to explain why an entity is trusted or risky.
  • Attestations create relationships between nodes
  • Trust flows across connections in the graph
 
-⸻
+
 
 ### ⚖️ Weighted Reputation Engine
  • User inputs are weighted based on credibility
  • Recent activity is prioritized using time decay
  • Final scores are calculated using weighted consensus, not simple averages
 
-⸻
+
 
 ### 🔁 Multi-Hop Trust Propagation
  • Trust influences spread across connected nodes
  • Indirect relationships (A → B → C) affect reputation scoring
  • Decay applied over distance to reduce inflated influence
 
-⸻
+
 
 ### 🛡 Risk Detection System
  • Detects suspicious voting patterns
@@ -55,7 +55,7 @@ It also uses AI to explain why an entity is trusted or risky.
  • Summarizes why an entity is trusted or flagged as risky
  • Improves interpretability of graph results
 
-⸻
+
 
 ### 🤖 Telegram Bot Interface
  • `/attest` → submit trust ratings
@@ -63,14 +63,14 @@ It also uses AI to explain why an entity is trusted or risky.
  • `/graph` → explore relationships
  • `/entities` → view ranked entities
 
-⸻
+
 
 ### 🌐 Web Visualization Dashboard
  • Interactive graph visualization using node-link structure
  • Real-time updates from Telegram interactions
  • Displays trust flow and relationship strength
 
-⸻
+
 
 ## 🏗 System Architecture
 
@@ -88,7 +88,7 @@ AI Analysis Layer
 Web Visualization Dashboard
 ```
 
-⸻
+
 
 ## 📊 Core Concepts
  • **Entity**: Any subject being evaluated (project, wallet, person, etc.)
@@ -97,25 +97,25 @@ Web Visualization Dashboard
  • **Propagation**: How trust spreads through connected nodes
  • **Confidence**: How reliable a score is based on data density and diversity
 
-⸻
+
 
 ## 🧪 Status
 
 This project is currently in active development and evolving into a full trust intelligence system.
 
-⸻
+
 
 ## 💡 Inspiration
 
 This project is inspired by the idea of decentralized knowledge and trust systems, where information is structured as a graph rather than isolated opinions.
 
-⸻
+
 
 ## ⚠️ Disclaimer
 
 This system is experimental and should not be used as a financial, identity, or security authority.
 
-⸻
+
 
 ## 📌 Future Improvements
  • Cross-chain wallet integration
