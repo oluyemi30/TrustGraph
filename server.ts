@@ -440,6 +440,20 @@ async function startTelegramBotPolling() {
 
   console.log(`[Telegram-Bot] Initiating Live Telegram Bot Polling using token...`);
 
+  // Clear any existing active webhooks to avoid 409 Conflicts upon startup
+  try {
+    const clearWebhookUrl = `https://api.telegram.org/bot${token}/deleteWebhook?drop_pending_updates=false`;
+    const clearRes = await fetch(clearWebhookUrl);
+    const clearBody: any = await clearRes.json();
+    if (clearBody.ok) {
+      console.log('[Telegram-Bot] Successfully cleared any existing webhooks before beginning polling.');
+    } else {
+      console.log('[Telegram-Bot] Webhook status check/clear response:', clearBody.description);
+    }
+  } catch (webhookErr: any) {
+    console.warn('[Telegram-Bot] Non-fatal issue resetting webhook on startup:', webhookErr.message);
+  }
+
   let offset = 0;
   
   // Clean, non-crashing poll loop
@@ -449,6 +463,11 @@ async function startTelegramBotPolling() {
       const response = await fetch(url);
       
       if (!response.ok) {
+        if (response.status === 409) {
+          console.warn('[Telegram-Bot] Polling conflict detected (HTTP 409). This typically happens during rapid hot-reloads when the previous server instance is still shutting down, or if another bot polling process is active. Backing off for 10 seconds...');
+          await new Promise(resolve => setTimeout(resolve, 10000));
+          continue;
+        }
         throw new Error(`HTTP Error status ${response.status}`);
       }
 
