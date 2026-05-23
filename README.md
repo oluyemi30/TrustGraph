@@ -1,20 +1,125 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# 🧠 Trust Graph Engine
 
-# Run and deploy your AI Studio app
+A trust graph intelligence system that models reputation using weighted attestations, multi-hop propagation, and AI-based analysis. It combines a Telegram bot interface with a web-based visualization layer to explore how trust flows across entities.
 
-This contains everything you need to run your app locally.
+⸻
 
-View your app in AI Studio: https://ai.studio/apps/075b3408-8a68-4868-8f34-93fc81969165
+## 🚀 Overview
 
-## Run Locally
+Trust Graph Engine is a system that turns user opinions into a structured intelligence network.
 
-**Prerequisites:**  Node.js
+Instead of simple ratings, it builds a graph of trust relationships between entities such as people, projects, wallets, or any named identity.
 
+The system then computes:
+ • Weighted reputation scores
+ • Trust propagation across connections
+ • Risk indicators
+ • Confidence levels
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+It also uses AI to explain why an entity is trusted or risky.
+
+⸻
+
+## 🧩 Key Features
+
+### 🕸 Trust Graph System
+ • Entities are represented as nodes (people, projects, wallets, etc.)
+ • Attestations create relationships between nodes
+ • Trust flows across connections in the graph
+
+⸻
+
+### ⚖️ Weighted Reputation Engine
+ • User inputs are weighted based on credibility
+ • Recent activity is prioritized using time decay
+ • Final scores are calculated using weighted consensus, not simple averages
+
+⸻
+
+### 🔁 Multi-Hop Trust Propagation
+ • Trust influences spread across connected nodes
+ • Indirect relationships (A → B → C) affect reputation scoring
+ • Decay applied over distance to reduce inflated influence
+
+⸻
+
+### 🛡 Risk Detection System
+ • Detects suspicious voting patterns
+ • Identifies clustered or low-diversity inputs
+ • Flags anomalies in trust behavior
+
+⸻
+
+### 🧠 AI Explanation Layer
+ • Generates natural language explanations of trust scores
+ • Summarizes why an entity is trusted or flagged as risky
+ • Improves interpretability of graph results
+
+⸻
+
+### 🤖 Telegram Bot Interface
+ • `/attest` → submit trust ratings
+ • `/trust` → view reputation analysis
+ • `/graph` → explore relationships
+ • `/entities` → view ranked entities
+
+⸻
+
+### 🌐 Web Visualization Dashboard
+ • Interactive graph visualization using node-link structure
+ • Real-time updates from Telegram interactions
+ • Displays trust flow and relationship strength
+
+⸻
+
+## 🏗 System Architecture
+
+```
+Telegram Bot
+      ↓
+Backend API
+      ↓
+Trust Graph Engine
+      ↓
+Database (Entities + Attestations)
+      ↓
+AI Analysis Layer
+      ↓
+Web Visualization Dashboard
+```
+
+⸻
+
+## 📊 Core Concepts
+ • **Entity**: Any subject being evaluated (project, wallet, person, etc.)
+ • **Attestation**: A trust signal from a user about an entity
+ • **Weight**: Influence score of a user’s input
+ • **Propagation**: How trust spreads through connected nodes
+ • **Confidence**: How reliable a score is based on data density and diversity
+
+⸻
+
+## 🧪 Status
+
+This project is currently in active development and evolving into a full trust intelligence system.
+
+⸻
+
+## 💡 Inspiration
+
+This project is inspired by the idea of decentralized knowledge and trust systems, where information is structured as a graph rather than isolated opinions.
+
+⸻
+
+## ⚠️ Disclaimer
+
+This system is experimental and should not be used as a financial, identity, or security authority.
+
+⸻
+
+## 📌 Future Improvements
+ • Cross-chain wallet integration
+ • On-chain attestation support
+ • Advanced Sybil attack detection
+ • Real-time distributed graph updates
+ • Improved AI reasoning layer
