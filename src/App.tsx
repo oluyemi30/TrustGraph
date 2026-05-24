@@ -152,6 +152,39 @@ export default function App() {
   const [graphIntelligence, setGraphIntelligence] = useState<GraphIntelligence | null>(null);
   const [isIntelligenceLoading, setIsIntelligenceLoading] = useState(false);
 
+  // Sync state
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
+
+  async function triggerIntuitionSync() {
+    setIsSyncing(true);
+    setSyncStatus('Initiating handshake with Intuition Sepolia...');
+    try {
+      const response = await fetch('/api/sync-intuition', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }).then(r => r.json());
+
+      if (response.success && response.stats) {
+        const stats = response.stats;
+        setSyncStatus(`Synced: ${stats.atomsSynced} Atoms & ${stats.claimsSynced} Statements via ${stats.endpointUsed} ${stats.isFallback ? '(Testnet Cache Link)' : ''}`);
+        await loadData();
+      } else {
+        setSyncStatus('Failed to sync with Intuition Sepolia nodes.');
+      }
+    } catch (err: any) {
+      console.error(err);
+      setSyncStatus('Network error synchronizing with Intuition Sepolia.');
+    } finally {
+      setIsSyncing(false);
+      setTimeout(() => {
+        setSyncStatus(null);
+      }, 7000);
+    }
+  }
+
   // Bot Simulator
   const [chatLog, setChatLog] = useState<ChatMessage[]>([
     {
@@ -554,21 +587,32 @@ export default function App() {
         {/* Real-time Indicator status */}
         <div className="hidden sm:flex items-center gap-4">
           <div className="text-right">
-            <span className="text-[10px] uppercase tracking-[0.2em] font-sans text-[#F5F2ED]/40">Network Status</span>
+            <span className="text-[10px] uppercase tracking-[0.2em] font-sans text-[#F5F2ED]/40">Intuition Protocol</span>
             <div className="flex items-center justify-end gap-2 text-emerald-400 mt-0.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="font-sans text-[10px] tracking-[0.2em] uppercase font-bold">SYNCED TO INTUITION.KGR</span>
+              <span className="font-sans text-[10px] tracking-[0.2em] uppercase font-bold">Sepolia Connected</span>
             </div>
           </div>
           <button 
-            onClick={() => loadData()}
-            className="p-2 bg-[#F5F2ED]/5 hover:bg-[#F5F2ED]/10 border border-[#F5F2ED]/25 transition-colors text-[#F5F2ED]"
-            title="Refresh Data"
+            onClick={triggerIntuitionSync}
+            disabled={isSyncing}
+            className={`px-3 py-2 bg-[#F5F2ED]/5 hover:bg-[#F5F2ED]/10 border border-[#F5F2ED]/25 transition-all text-xs font-sans uppercase tracking-wider flex items-center gap-2 text-[#F5F2ED] rounded-none cursor-pointer ${isSyncing ? 'opacity-70 cursor-not-allowed' : ''}`}
+            title="Sync live Atoms and Claims from Intuition Sepolia indexing gateway"
           >
-            <RefreshCw className="h-3.5 w-3.5" />
+            <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+            {isSyncing ? 'Syncing...' : 'Sync Sepolia'}
           </button>
         </div>
       </header>
+
+      {/* Sync Status Banner */}
+      {syncStatus && (
+        <div className="bg-[#F5F2ED] text-[#0A0A0A] px-8 py-3 text-xs font-sans tracking-wider flex items-center gap-3 border-b border-[#F5F2ED]/30 animate-pulse">
+          <Radio className="h-4 w-4 text-emerald-600 animate-ping" />
+          <span className="font-bold">SEPOLIA INTEGRATION:</span>
+          <span>{syncStatus}</span>
+        </div>
+      )}
 
       {/* Main Grid Panels */}
       <main className="flex-1 w-full max-w-[1700px] mx-auto p-4 sm:p-6 lg:p-12 grid grid-cols-1 xl:grid-cols-12 gap-12">

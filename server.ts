@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import { db } from './server/db';
 import { explainTrust } from './server/ai';
+import { syncWithIntuitionSepolia } from './server/sync';
 
 // Load environment variables
 dotenv.config();
@@ -341,6 +342,17 @@ app.post('/api/ai-explain', async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+// Sync with Intuition Sepolia Testnet
+app.post('/api/sync-intuition', async (req, res) => {
+  try {
+    const stats = await syncWithIntuitionSepolia();
+    res.json({ success: true, stats });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 
 // D3 Node-Link mapping endpoints
 app.get('/api/graph', (req, res) => {
