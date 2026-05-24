@@ -1459,9 +1459,10 @@ export default function App() {
                         ? 'bg-[#F5F2ED]/5 border border-[#F5F2ED]/20 text-[#F5F2ED]'
                         : 'bg-[#F5F2ED] border-none text-[#0A0A0A] selection:bg-[#0A0A0A] selection:text-[#F5F2ED]'
                     }`}>
-                      <div className="whitespace-pre-line font-sans tracking-wide leading-relaxed">
-                        {msg.text}
-                      </div>
+                      <div 
+                        className="whitespace-pre-line font-sans tracking-wide leading-relaxed"
+                        dangerouslySetInnerHTML={{ __html: msg.text }}
+                      />
                       <span className={`block text-[8px] font-mono mt-3 text-right ${
                         msg.sender === 'user' ? 'text-[#F5F2ED]/30' : 'text-[#0A0A0A]/40'
                       }`}>

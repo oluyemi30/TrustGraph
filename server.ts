@@ -60,6 +60,13 @@ function parseArgs(text: string): string[] {
   return args;
 }
 
+function escapeHTML(str: string): string {
+  return (str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 export async function processBotMessage(
   text: string, 
   user: TelegramCommandUser
@@ -68,47 +75,49 @@ export async function processBotMessage(
   const username = user.username || `User_${user.id}`;
 
   if (!input.startsWith('/')) {
-    return '💬 *Chat message received.* Please type `/` to see available commands, or enter a command like `/start`.';
+    return '💬 <b>Chat message received.</b> Please type <code>/</code> to see available commands, or enter a command like <code>/start</code>.';
   }
 
   // Parse command name and args using robust quote-aware logic
   const args = parseArgs(input);
   if (args.length === 0) {
-    return '❓ *Unknown Command.* Type `/start` to view available instructions.';
+    return '❓ <b>Unknown Command.</b> Type <code>/start</code> to view available instructions.';
   }
   const command = args[0].toLowerCase();
 
   switch (command) {
     case '/start': {
-      return `🤖 *Welcome to the TrustGraph Bot!* 🕸️
+      return `🤖 <b>Welcome to the TrustGraph Bot!</b> 🕸️
 
-Inspired by decentralized trust protocols like *Intuition*, this system maps peer trust relationships using **Atoms** (identities like projects/wallets) and **Triples** (statements of the form \`Subject ➜ predicate ➜ Object\` carrying **Dynamic weights**).
+Inspired by decentralized trust protocols like <i>Intuition</i>, this system maps peer trust relationships using <b>Atoms</b> (identities like projects/wallets) and <b>Triples</b> (statements of the form <code>Subject ➜ predicate ➜ Object</code> carrying <b>Dynamic weights</b>).
 
-📈 *Decentralized Trust Intelligence (V1 Upgrade):*
-• **Weighted Trust:** Evaluations are weighted based on the contributor's credibility.
-• **Dynamic Reputation:** Users earn reputational weight by rating nodes and aligning with consensus.
-• **Time Decay:** Over time, older ratings slowly decay, preserving fresh signals.
-• **Anti-Spam Logic:** One active slot per entity node; consecutive ratings update your previous attestations.
+📈 <b>Decentralized Trust Intelligence (V1 Upgrade):</b>
+• <b>Weighted Trust:</b> Evaluations are weighted based on the contributor's credibility.
+• <b>Dynamic Reputation:</b> Users earn reputational weight by rating nodes and aligning with consensus.
+• <b>Time Decay:</b> Over time, older ratings slowly decay, preserving fresh signals.
+• <b>Anti-Spam Logic:</b> One active slot per entity node; consecutive ratings update your previous attestations.
 
-📌 *Core Commands:*
-1. \`/attest <entity> <score 1-5> <comment>\` — Stake/update a trust signal. Creates the entity is it does not exist yet.
-2. \`/trust <entity>\` — Retrieve ratings, AI reports, risk parameters, and credibility weights.
-3. \`/graph <entity>\` — Unroll the connection graph representing peer trust claimants.
-4. \`/entities\` — Rank global registered identity nodes by their consensus ratings.
+📌 <b>Core Commands:</b>
+1. <code>/attest &lt;entity&gt; &lt;score 1-5&gt; &lt;comment&gt;</code> — Stake/update a trust signal. Creates the entity if it does not exist yet.
+2. <code>/trust &lt;entity&gt;</code> — Retrieve ratings, AI reports, risk parameters, and credibility weights.
+3. <code>/graph &lt;entity&gt;</code> — Unroll the connection graph representing peer trust claimants.
+4. <code>/sync</code> — Sync live Atoms and Claims from Intuition Sepolia testnet indexer.
+5. <code>/entities</code> — Rank global registered identity nodes by their consensus ratings.
 
-💡 *Examples:*
-• \`/attest Ethereum 5 "Core layer-1 layer of smart contracts."\`
-• \`/trust Ethereum\`
-• \`/graph Ethereum\`
-• \`/entities\``;
+💡 <b>Examples:</b>
+• <code>/attest Ethereum 5 "Core layer-1 layer of smart contracts."</code>
+• <code>/trust Ethereum</code>
+• <code>/graph Ethereum</code>
+• <code>/sync</code>
+• <code>/entities</code>`;
     }
 
     case '/attest': {
       if (args.length < 3) {
-        return `❌ *Error: Missing parameters.*
-Syntax: \`/attest <entity_name> <score 1-5> <comment>\`
+        return `❌ <b>Error: Missing parameters.</b>
+Syntax: <code>/attest &lt;entity_name&gt; &lt;score 1-5&gt; &lt;comment&gt;</code>
 
-Example: \`/attest Uniswap 5 "Superb liquidity Pools"\``;
+Example: <code>/attest Uniswap 5 "Superb liquidity Pools"</code>`;
       }
 
       const entity = args[1];
@@ -116,8 +125,8 @@ Example: \`/attest Uniswap 5 "Superb liquidity Pools"\``;
       const rating = parseInt(ratingStr, 10);
 
       if (isNaN(rating) || rating < 1 || rating > 5) {
-        return `❌ *Error: Invalid trust score.*
-The rating must be a valid integer between **1 and 5** (where 5 represents absolute trust).`;
+        return `❌ <b>Error: Invalid trust score.</b>
+The rating must be a valid integer between <b>1 and 5</b> (where 5 represents absolute trust).`;
       }
 
       // Collect everything after rating index as comment
@@ -129,34 +138,34 @@ The rating must be a valid integer between **1 and 5** (where 5 represents absol
       const att = db.addAttestation(username, entity, rating, comment);
       const atom = db.findAtom(entity);
 
-      return `✅ *Reputation Signal Registered Successfully!*
+      return `✅ <b>Reputation Signal Registered Successfully!</b>
 
-*Atom Node:* \`${atom?.displayName || entity}\` (${atom?.type || 'project'})
-*Triple Claim:* \`@${username}\` ➜ \`trusts\` ➜ \`${atom?.displayName || entity}\`
-*Assessed Score:* \`⭐ ${rating}/5\`
+• <b>Atom Node:</b> <code>${escapeHTML(atom?.displayName || entity)}</code> (${escapeHTML(atom?.type || 'project')})
+• <b>Triple Claim:</b> <code>@${escapeHTML(username)}</code> ➜ <code>trusts</code> ➜ <code>${escapeHTML(atom?.displayName || entity)}</code>
+• <b>Assessed Score:</b> <code>⭐ ${rating}/5</code>
 
-💬 *Latest Comment/Stake:*
-_"${comment}"_
+💬 <b>Latest Comment/Stake:</b>
+<i>"${escapeHTML(comment)}"</i>
 
-🛡️ _Note: Sybil-Spam protection activated. Registering a rating on an entity updates your active stake and timestamps._`;
+🛡️ <i>Note: Sybil-Spam protection activated. Registering a rating on an entity updates your active stake and timestamps.</i>`;
     }
 
     case '/trust': {
       const entity = args[1];
       if (!entity) {
-        return `❌ *Error: Missing identity atom.*
-Syntax: \`/trust <entity_name>\`
+        return `❌ <b>Error: Missing identity atom.</b>
+Syntax: <code>/trust &lt;entity_name&gt;</code>
 
-Example: \`/trust Ethereum\``;
+Example: <code>/trust Ethereum</code>`;
       }
 
       const atom = db.findAtom(entity);
       if (!atom) {
-        return `🔍 *Entity not found.*
-No reputation signals have been staked for \`${entity}\` yet.
+        return `🔍 <b>Entity not found.</b>
+No reputation signals have been staked for <code>${escapeHTML(entity)}</code> yet.
 
 Create the first attestation by running:
-\`/attest ${entity} 5 "First trust claim"\``;
+<code>/attest ${escapeHTML(entity)} 5 "First trust claim"</code>`;
       }
 
       const stats = db.getEntityStats(entity);
@@ -171,34 +180,34 @@ Create the first attestation by running:
 
       const stars = '⭐'.repeat(Math.round(stats.average || 0)) || 'None';
 
-      let response = `📊 *Reputation Report Card: ${atom.displayName}*
-*Asset Class:* \`${atom.type.toUpperCase()}\`
-*Created on Core:* ${new Date(atom.created_at).toLocaleDateString()}
+      let response = `📊 <b>Reputation Report Card: ${escapeHTML(atom.displayName)}</b>
+• <b>Asset Class:</b> <code>${escapeHTML(atom.type.toUpperCase())}</code>
+• <b>Created on Core:</b> ${new Date(atom.created_at).toLocaleDateString()}
 
-📈 *Consensus Indicators:*
-• *Weighted Average Score:* **${stats.average}/5** (${stars})
-• *Direct Simple Average:* \`${stats.simpleAverage}/5\`
-• *Active Trust Claims:* \`${stats.count}\` unique contributor${stats.count === 1 ? '' : 's'}
+📈 <b>Consensus Indicators:</b>
+• <b>Weighted Average Score:</b> <b>${stats.average}/5</b> (${stars})
+• <b>Direct Simple Average:</b> <code>${stats.simpleAverage}/5</code>
+• <b>Active Trust Claims:</b> <code>${stats.count}</code> unique contributor${stats.count === 1 ? '' : 's'}
 
 `;
 
       if (aiAnalysis) {
-        response += `🤖 *AI Evaluation Summary:*
-_${aiAnalysis.summary}_
+        response += `🤖 <b>AI Evaluation Summary:</b>
+<i>${escapeHTML(aiAnalysis.summary)}</i>
 
-⚠️ *AI Consensus Risk Signals:*
-${aiAnalysis.riskSignals.map(sig => `• ${sig}`).join('\n')}
+⚠️ <b>AI Consensus Risk Signals:</b>
+${aiAnalysis.riskSignals.map(sig => `• ${escapeHTML(sig)}`).join('\n')}
 
-🎯 *AI Assessment Confidence:* \`${aiAnalysis.confidenceLevel.toUpperCase()}\`
+🎯 <b>AI Assessment Confidence:</b> <code>${escapeHTML(aiAnalysis.confidenceLevel.toUpperCase())}</code>
 
 `;
       }
 
       const weightList = stats.weightDetails || [];
-      response += `💬 *Recent Verified Attestations (Weighted Index):*
-${weightList.slice(-3).map(w => `• *@${w.from_user}* (⭐ ${w.trust_score}/5):
-  _"${w.comment || 'No comment staked.'}"_
-  └ \`User Rep: ${w.user_credibility}x\` | \`Recency Decent: ${Math.round(w.time_decay * 100)}%\` | \`Net Weight: ${w.final_weight}\``).join('\n\n')}`;
+      response += `💬 <b>Recent Verified Attestations (Weighted Index):</b>
+${weightList.slice(-3).map(w => `• <b>@${escapeHTML(w.from_user)}</b> (⭐ ${w.trust_score}/5):
+  <i>"${escapeHTML(w.comment || 'No comment staked.')}"</i>
+  └ <code>User Rep: ${w.user_credibility}x</code> | <code>Recency Decay: ${Math.round(w.time_decay * 100)}%</code> | <code>Net Weight: ${w.final_weight}</code>`).join('\n\n')}`;
 
       return response;
     }
@@ -206,59 +215,80 @@ ${weightList.slice(-3).map(w => `• *@${w.from_user}* (⭐ ${w.trust_score}/5):
     case '/graph': {
       const entity = args[1];
       if (!entity) {
-        return `❌ *Error: Missing identity atom.*
-Syntax: \`/graph <entity_name>\`
+        return `❌ <b>Error: Missing identity atom.</b>
+Syntax: <code>/graph &lt;entity_name&gt;</code>
 
-Example: \`/graph Binance\``;
+Example: <code>/graph Binance</code>`;
       }
 
       const atom = db.findAtom(entity);
       if (!atom) {
-        return `🔍 *Entity not found.*
-No connection triple relationships exist for \`${entity}\` yet.`;
+        return `🔍 <b>Entity not found.</b>
+No connection triple relationships exist for <code>${escapeHTML(entity)}</code> yet.`;
       }
 
       const relatedTriples = db.getTriples().filter(t => t.object.toLowerCase() === atom.name);
 
       if (relatedTriples.length === 0) {
-        return `🕸️ *TrustGraph for ${atom.displayName}:*
+        return `🕸️ <b>TrustGraph for ${escapeHTML(atom.displayName)}:</b>
 No incoming trust links are registered to this atom.`;
       }
 
-      return `🕸️ *TrustGraph: ${atom.displayName}*
-Found \`${relatedTriples.length}\` active trust relationships.
+      return `🕸️ <b>TrustGraph: ${escapeHTML(atom.displayName)}</b>
+Found <code>${relatedTriples.length}</code> active trust relationships.
 
-*Triple Inbound Claims (Subject ➜ Predicate ➜ Object):*
-${relatedTriples.map(t => `• \`${t.subject}\` ➜ \`${t.predicate}\` ➜ \`${atom.displayName}\` (Power: *${t.score}/5*)`).join('\n')}`;
+<b>Triple Inbound Claims (Subject ➜ Predicate ➜ Object):</b>
+${relatedTriples.map(t => `• <code>${escapeHTML(t.subject)}</code> ➜ <code>${escapeHTML(t.predicate)}</code> ➜ <code>${escapeHTML(atom.displayName)}</code> (Power: <b>${t.score}/5</b>)`).join('\n')}`;
     }
 
     case '/entities': {
       const statsList = db.getTopEntities();
 
       if (statsList.length === 0) {
-        return `🏆 *TrustGraph Standings:*
-No entities registered on the identity ledger yet. Start the movement with \`/attest\`!`;
+        return `🏆 <b>TrustGraph Standings:</b>
+No entities registered on the identity ledger yet. Start the movement with <code>/attest</code>!`;
       }
 
-      let response = `🏆 *Top TrustGraph Identities*
-Total Registered Atoms: \`${db.getAtoms().length}\`
+      let response = `🏆 <b>Top TrustGraph Identities</b>
+Total Registered Atoms: <code>${db.getAtoms().length}</code>
 
 `;
       statsList.forEach((ent, index) => {
         const ratingStars = '⭐'.repeat(Math.ceil(ent.average)) || '⭐';
-        response += `${index + 1}. *${ent.displayName}* (Class: \`${ent.type}\`)
-   • Weighted Score: *${ent.average}/5* (${ratingStars}) | Simple Avg: \`${ent.simpleAverage}/5\`
-   • Contributors: *${ent.count}* active stake${ent.count === 1 ? '' : 's'}
-   • Description: _"${ent.description || 'No description provided.'}"_
+        response += `${index + 1}. <b>${escapeHTML(ent.displayName)}</b> (Class: <code>${escapeHTML(ent.type)}</code>)
+   • Weighted Score: <b>${ent.average}/5</b> (${ratingStars}) | Simple Avg: <code>${ent.simpleAverage}/5</code>
+   • Contributors: <b>${ent.count}</b> active stake${ent.count === 1 ? '' : 's'}
+   • Description: <i>"${escapeHTML(ent.description || 'No description provided.')}"</i>
 \n`;
       });
 
       return response;
     }
 
+    case '/sync': {
+      try {
+        const stats = await syncWithIntuitionSepolia();
+        return `🔄 <b>Intuition Sepolia Sync Executed Successfully!</b>
+        
+The TrustGraph database has been successfully synchronized using live records from the decentralized indexing node.
+
+📊 <b>Synchronization Performance Stats:</b>
+• <b>Atoms Synced:</b> <code>${stats.atomsSynced}</code>
+• <b>Claims Synced (Triples):</b> <code>${stats.claimsSynced}</code>
+• <b>Sepolia Node Gateway:</b> <code>${stats.endpointUsed}</code>
+• <b>Sync Strategy:</b> ${stats.isFallback ? '<i>Activated Testnet Caching Buffer</i>' : '<i>Established Real-time Sepolia Gateway Connection</i>'}
+• <b>Execution Timestamp:</b> <code>${stats.timestamp}</code>
+
+📌 <i>Type /entities to inspect the real-time reputation leaderboards!</i>`;
+      } catch (err: any) {
+        return `❌ <b>Sync Failed:</b>
+<code>${escapeHTML(err.message)}</code>`;
+      }
+    }
+
     default: {
-      return `❓ *Unknown Command: ${command}*
-Type \`/start\` to view a list of all active TrustGraph Ledger commands.`;
+      return `❓ <b>Unknown Command: ${escapeHTML(command)}</b>
+Type <code>/start</code> to view a list of all active TrustGraph Ledger commands.`;
     }
   }
 }
@@ -496,21 +526,21 @@ async function startTelegramBotPolling() {
             console.log(`[Telegram-Bot] Command received from @${from.username || from.id}: "${text}"`);
             
             // Standard commands routing
-            const replyMarkdown = await processBotMessage(text, {
+            const replyHTML = await processBotMessage(text, {
               id: String(from.id),
               username: from.username || `User_${from.id}`,
               first_name: from.first_name || 'Incognito'
             });
 
-            // Convert raw HTML-bold templates to custom bot modes if necessary, standard telegram parses standard MarkdownV2 or HTML
+            // Send standard HTML-styled message to Telegram client
             const sendUrl = `https://api.telegram.org/bot${token}/sendMessage`;
             await fetch(sendUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 chat_id: msg.chat.id,
-                text: replyMarkdown,
-                parse_mode: 'Markdown' // Telegram normal Markdown parser support beautifully
+                text: replyHTML,
+                parse_mode: 'HTML' // Telegram native HTML parser
               })
             });
           }
