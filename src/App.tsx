@@ -22,7 +22,8 @@ import {
   BadgeAlert,
   Sliders,
   ChevronRight,
-  GitFork
+  GitFork,
+  Clock
 } from 'lucide-react';
 
 interface Atom {
@@ -155,6 +156,35 @@ export default function App() {
   // Sync state
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
+
+  // Auto-Sync Polling
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState<boolean>(false);
+  const [secondsUntilNextSync, setSecondsUntilNextSync] = useState<number>(300); // 5 minutes (300 seconds)
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    if (autoSyncEnabled) {
+      setSecondsUntilNextSync(300);
+      timer = setInterval(() => {
+        setSecondsUntilNextSync((prev) => {
+          if (prev <= 1) {
+            triggerIntuitionSync();
+            return 300;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [autoSyncEnabled]);
+
+  function formatTimeRemaining(seconds: number): string {
+    const min = Math.floor(seconds / 60);
+    const sec = seconds % 60;
+    return `${min}:${sec < 10 ? '0' : ''}${sec}`;
+  }
 
   async function triggerIntuitionSync() {
     setIsSyncing(true);
@@ -585,7 +615,34 @@ export default function App() {
         </div>
 
         {/* Real-time Indicator status */}
-        <div className="hidden sm:flex items-center gap-4">
+        <div className="hidden sm:flex items-center gap-6">
+          {/* Auto-Sync Toggle */}
+          <div className="flex items-center gap-2.5 px-3 py-1.5 border border-[#F5F2ED]/15 bg-[#F5F2ED]/5 select-none hover:bg-[#F5F2ED]/10 transition-colors">
+            <div className="relative inline-flex items-center cursor-pointer">
+              <input 
+                type="checkbox" 
+                id="auto-sync-toggle"
+                checked={autoSyncEnabled}
+                onChange={(e) => setAutoSyncEnabled(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-8 h-4 bg-[#F5F2ED]/10 rounded-full peer peer-checked:bg-emerald-500/80 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-[#F5F2ED] after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
+            </div>
+            <div className="flex flex-col text-left min-w-[65px]">
+              <span className="text-[9px] uppercase tracking-[0.1em] font-sans text-[#F5F2ED]/75 font-semibold">Auto-Sync</span>
+              <span className="text-[8px] font-mono text-[#F5F2ED]/45 flex items-center gap-1">
+                {autoSyncEnabled ? (
+                  <>
+                    <Clock className="h-2.5 w-2.5 text-emerald-400 animate-pulse" />
+                    <span>{formatTimeRemaining(secondsUntilNextSync)}</span>
+                  </>
+                ) : (
+                  'Disabled'
+                )}
+              </span>
+            </div>
+          </div>
+
           <div className="text-right">
             <span className="text-[10px] uppercase tracking-[0.2em] font-sans text-[#F5F2ED]/40">Intuition Protocol</span>
             <div className="flex items-center justify-end gap-2 text-emerald-400 mt-0.5">
