@@ -1,10 +1,5 @@
 import { db } from './db';
-
-const INTUITION_MAINNET_ENDPOINTS = [
-  'https://api.intuition.systems/v1/graphql',
-  'https://api.testnet.intuition.systems/v1/graphql',
-  'https://dev.api.intuition.systems/v1/graphql'
-];
+import { IntuitionSDK } from '@intuitionmachine/sdk';
 
 interface SyncStats {
   atomsSynced: number;
@@ -19,68 +14,26 @@ interface SyncStats {
  * Falls back to high-grade mainnet cache if the endpoints are unresponsive or indexer is down.
  */
 export async function syncWithIntuitionMainnet(): Promise<SyncStats> {
-  const query = `
-    query getRecentAtomsAndClaims {
-      atoms(limit: 50, order_by: {created_at: desc}) {
-        id
-        label
-        value
-        type
-        creator
-        created_at
-      }
-      claims(limit: 30, order_by: {created_at: desc}) {
-        id
-        subject {
-          id
-          label
-        }
-        predicate {
-          id
-          label
-        }
-        object {
-          id
-          label
-        }
-        creator
-        created_at
-      }
-    }
-  `;
+  const sdk = new IntuitionSDK({
+    apiKey: process.env.INTUITION_API_KEY || '',
+    network: 'base'
+  });
 
   let fetchedData: any = null;
   let endpointUsed = 'None';
   let isFallback = true;
 
-  // Try live endpoints in round-robin or sequence
-  for (const endpoint of INTUITION_MAINNET_ENDPOINTS) {
-    try {
-      console.log(`[Sync-Engine] Checking Intuition network gateway: ${endpoint}`);
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({ query }),
-        // 5 seconds timeout
-        signal: AbortSignal.timeout(5000),
-      });
-
-      if (res.ok) {
-        const payload = await res.json();
-        if (payload && payload.data) {
-          fetchedData = payload.data;
-          endpointUsed = endpoint;
-          isFallback = false;
-          console.log(`[Sync-Engine] Success! Connected to real-time Mainnet gateway via ${endpoint}`);
-          break;
-        }
-      }
-    } catch (err: any) {
-      console.log(`[Sync-Engine] Gateway ${endpoint} is currently offline or rate-limited. Moving to next available endpoint/local mainnet buffer...`);
+  try {
+    console.log(`[Sync-Engine] Checking Intuition Base network via IntuitionSDK...`);
+    const payload = await sdk.getRecentAtomsAndClaims(50, 30);
+    if (payload && payload.data) {
+      fetchedData = payload.data;
+      endpointUsed = sdk.endpoint;
+      isFallback = false;
+      console.log(`[Sync-Engine] Success! Connected to real-time Mainnet gateway via IntuitionSDK: ${sdk.endpoint}`);
     }
+  } catch (err: any) {
+    console.log(`[Sync-Engine] Gateway is currently offline or rate-limited. Moving to next available endpoint/local mainnet buffer... Error: ${err.message}`);
   }
 
   let atomsSyncedCount = 0;
