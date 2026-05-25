@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import { db } from './server/db';
 import { explainTrust } from './server/ai';
-import { syncWithIntuitionSepolia } from './server/sync';
+import { syncWithIntuitionMainnet } from './server/sync';
 
 // Load environment variables
 dotenv.config();
@@ -101,7 +101,7 @@ Inspired by decentralized trust protocols like <i>Intuition</i>, this system map
 1. <code>/attest &lt;entity&gt; &lt;score 1-5&gt; &lt;comment&gt;</code> — Stake/update a trust signal. Creates the entity if it does not exist yet.
 2. <code>/trust &lt;entity&gt;</code> — Retrieve ratings, AI reports, risk parameters, and credibility weights.
 3. <code>/graph &lt;entity&gt;</code> — Unroll the connection graph representing peer trust claimants.
-4. <code>/sync</code> — Sync live Atoms and Claims from Intuition Sepolia testnet indexer.
+4. <code>/sync</code> — Sync live Atoms and Claims from Intuition Mainnet (Base L2) indexer.
 5. <code>/entities</code> — Rank global registered identity nodes by their consensus ratings.
 
 💡 <b>Examples:</b>
@@ -267,16 +267,16 @@ Total Registered Atoms: <code>${db.getAtoms().length}</code>
 
     case '/sync': {
       try {
-        const stats = await syncWithIntuitionSepolia();
-        return `🔄 <b>Intuition Sepolia Sync Executed Successfully!</b>
+        const stats = await syncWithIntuitionMainnet();
+        return `🔄 <b>Intuition Mainnet Sync Executed Successfully!</b>
         
-The TrustGraph database has been successfully synchronized using live records from the decentralized indexing node.
+The TrustGraph database has been successfully synchronized using live records from the Base Mainnet decentralized indexing node.
 
 📊 <b>Synchronization Performance Stats:</b>
 • <b>Atoms Synced:</b> <code>${stats.atomsSynced}</code>
 • <b>Claims Synced (Triples):</b> <code>${stats.claimsSynced}</code>
-• <b>Sepolia Node Gateway:</b> <code>${stats.endpointUsed}</code>
-• <b>Sync Strategy:</b> ${stats.isFallback ? '<i>Activated Testnet Caching Buffer</i>' : '<i>Established Real-time Sepolia Gateway Connection</i>'}
+• <b>Mainnet Node Gateway:</b> <code>${stats.endpointUsed}</code>
+• <b>Sync Strategy:</b> ${stats.isFallback ? '<i>Activated Mainnet Caching Buffer</i>' : '<i>Established Real-time Base Mainnet Gateway Connection</i>'}
 • <b>Execution Timestamp:</b> <code>${stats.timestamp}</code>
 
 📌 <i>Type /entities to inspect the real-time reputation leaderboards!</i>`;
@@ -373,10 +373,10 @@ app.post('/api/ai-explain', async (req, res) => {
   }
 });
 
-// Sync with Intuition Sepolia Testnet
+// Sync with Intuition Mainnet
 app.post('/api/sync-intuition', async (req, res) => {
   try {
-    const stats = await syncWithIntuitionSepolia();
+    const stats = await syncWithIntuitionMainnet();
     res.json({ success: true, stats });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

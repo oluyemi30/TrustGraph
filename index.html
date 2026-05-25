@@ -3,7 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
+    <title>TrustGraph Reputation & Trust Workspace</title>
+    <script>
+      (function() {
+        // Intercept Object.defineProperty to handle safe-guarding and preventing
+        // "Cannot redefine property: ethereum" errors in standard web3 injection cases.
+        const originalDefineProperty = Object.defineProperty;
+        Object.defineProperty = function(obj, prop, descriptor) {
+          if (prop === 'ethereum' && (obj === window || obj === globalThis)) {
+            try {
+              return originalDefineProperty.apply(this, arguments);
+            } catch (err) {
+              console.warn("[Reputation-Guard] Prevented crash during window.ethereum definition. Error handled:", err.message);
+              return obj;
+            }
+          }
+          return originalDefineProperty.apply(this, arguments);
+        };
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

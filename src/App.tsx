@@ -158,7 +158,7 @@ export default function App() {
 
   async function triggerIntuitionSync() {
     setIsSyncing(true);
-    setSyncStatus('Initiating handshake with Intuition Sepolia...');
+    setSyncStatus('Initiating handshake with Intuition Mainnet (Base L2)...');
     try {
       const response = await fetch('/api/sync-intuition', {
         method: 'POST',
@@ -169,14 +169,14 @@ export default function App() {
 
       if (response.success && response.stats) {
         const stats = response.stats;
-        setSyncStatus(`Synced: ${stats.atomsSynced} Atoms & ${stats.claimsSynced} Statements via ${stats.endpointUsed} ${stats.isFallback ? '(Testnet Cache Link)' : ''}`);
+        setSyncStatus(`Synced: ${stats.atomsSynced} Atoms & ${stats.claimsSynced} Claims via ${stats.endpointUsed} ${stats.isFallback ? '(Cached Buffer)' : ''}`);
         await loadData();
       } else {
-        setSyncStatus('Failed to sync with Intuition Sepolia nodes.');
+        setSyncStatus('Failed to sync with Intuition Mainnet nodes.');
       }
     } catch (err: any) {
       console.error(err);
-      setSyncStatus('Network error synchronizing with Intuition Sepolia.');
+      setSyncStatus('Network error synchronizing with Intuition Mainnet.');
     } finally {
       setIsSyncing(false);
       setTimeout(() => {
@@ -590,17 +590,17 @@ export default function App() {
             <span className="text-[10px] uppercase tracking-[0.2em] font-sans text-[#F5F2ED]/40">Intuition Protocol</span>
             <div className="flex items-center justify-end gap-2 text-emerald-400 mt-0.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="font-sans text-[10px] tracking-[0.2em] uppercase font-bold">Sepolia Connected</span>
+              <span className="font-sans text-[10px] tracking-[0.2em] uppercase font-bold">Mainnet Connected</span>
             </div>
           </div>
           <button 
             onClick={triggerIntuitionSync}
             disabled={isSyncing}
             className={`px-3 py-2 bg-[#F5F2ED]/5 hover:bg-[#F5F2ED]/10 border border-[#F5F2ED]/25 transition-all text-xs font-sans uppercase tracking-wider flex items-center gap-2 text-[#F5F2ED] rounded-none cursor-pointer ${isSyncing ? 'opacity-70 cursor-not-allowed' : ''}`}
-            title="Sync live Atoms and Claims from Intuition Sepolia indexing gateway"
+            title="Sync live Atoms and Claims from Intuition Mainnet indexing gateway"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-            {isSyncing ? 'Syncing...' : 'Sync Sepolia'}
+            {isSyncing ? 'Syncing...' : 'Sync Mainnet'}
           </button>
         </div>
       </header>
@@ -609,7 +609,7 @@ export default function App() {
       {syncStatus && (
         <div className="bg-[#F5F2ED] text-[#0A0A0A] px-8 py-3 text-xs font-sans tracking-wider flex items-center gap-3 border-b border-[#F5F2ED]/30 animate-pulse">
           <Radio className="h-4 w-4 text-emerald-600 animate-ping" />
-          <span className="font-bold">SEPOLIA INTEGRATION:</span>
+          <span className="font-bold">MAINNET INTEGRATION:</span>
           <span>{syncStatus}</span>
         </div>
       )}
