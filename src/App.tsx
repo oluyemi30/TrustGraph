@@ -2254,52 +2254,7 @@ export default function App() {
             </div>
           )}
 
-          {/* Setup Guide Accordion */}
-          <div className="border border-[#F5F2ED]/10 p-6 bg-[#F5F2ED]/2 rounded-none">
-            <h2 className="text-xs uppercase tracking-[0.2em] font-sans text-[#F5F2ED]/40 mb-3 flex items-center gap-1.5">
-              <Terminal className="h-3.5 w-3.5 text-[#F5F2ED]" />
-              Production Setup Guide
-            </h2>
 
-            <div className="border border-[#F5F2ED]/10 p-5 rounded-none text-xs space-y-4 font-sans leading-relaxed text-[#F5F2ED]/80">
-              <p className="text-[#F5F2ED]/50 leading-relaxed font-serif italic">
-                To connect this application to a real live running Telegram Bot, follow these simple production parameters:
-              </p>
-
-              <div className="space-y-1.5 p-4 border border-[#F5F2ED]/10 bg-[#0A0A0A]/40 rounded-none">
-                <div className="flex justify-between text-[11px] uppercase tracking-wider text-[#C5A880] font-bold">
-                  <span>1. Generate Bot Token</span>
-                  <span className="text-[#F5F2ED]/30 font-normal">@BotFather</span>
-                </div>
-                <p className="text-[#F5F2ED]/60 text-[11px] leading-relaxed">
-                  Open Telegram, search for **@BotFather**, send `/newbot`, choose a name, and copy the provided `API Token`.
-                </p>
-              </div>
-
-              <div className="space-y-1.5 p-4 border border-[#F5F2ED]/10 bg-[#0A0A0A]/40 rounded-none">
-                <div className="flex justify-between text-[11px] uppercase tracking-wider text-[#C5A880] font-bold">
-                  <span>2. Inject Environment Variable</span>
-                  <span className="text-[#F5F2ED]/30 font-normal">Secrets / .env</span>
-                </div>
-                <p className="text-[#F5F2ED]/60 text-[11px] leading-relaxed">
-                  Paste the token inside your local `.env` or write a new Secret key parameter on the settings drawer:
-                </p>
-                <pre className="text-[10px] bg-[#0A0A0A] p-3 text-[#C5A880] border border-[#F5F2ED]/10 font-mono">
-                  {"TELEGRAM_BOT_TOKEN=\"583921...MY-TELEGRAM-TOKEN-HERE\""}
-                </pre>
-              </div>
-
-              <div className="space-y-1.5 p-4 border border-[#F5F2ED]/10 bg-[#0A0A0A]/40 rounded-none">
-                <div className="flex justify-between text-[11px] uppercase tracking-wider text-[#C5A880] font-bold">
-                  <span>3. Boot Live polling</span>
-                  <span className="text-[#F5F2ED]/30 font-normal">npm start</span>
-                </div>
-                <p className="text-[#F5F2ED]/60 text-[11px] leading-relaxed font-serif italic">
-                  The Express server automatically detects the token, spins up real-time update polling threads, and handles active user chats instantly!
-                </p>
-              </div>
-            </div>
-          </div>
 
         </div>
 
