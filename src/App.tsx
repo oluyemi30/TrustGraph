@@ -1000,10 +1000,18 @@ export default function App() {
           </div>
 
           <div className="text-right">
-            <span className="text-[10px] uppercase tracking-[0.2em] font-sans text-[#F5F2ED]/40">Intuition Protocol</span>
-            <div className="flex items-center justify-end gap-2 text-emerald-400 mt-0.5">
+            <span className="text-[10px] uppercase tracking-[0.2em] font-sans text-[#F5F2ED]/40 font-bold">Intuition Network</span>
+            <div className="flex items-center justify-end gap-2 mt-0.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="font-sans text-[10px] tracking-[0.2em] uppercase font-bold">Mainnet Connected</span>
+              <a 
+                href="https://testnet.explorer.intuition.systems/" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="font-sans text-[10px] tracking-[0.15em] text-emerald-400 hover:text-emerald-300 transition-all uppercase font-bold underline flex items-center gap-0.5"
+                title="Explore Atoms and Claims on the official Intuition Testnet Explorer"
+              >
+                Testnet Explorer ↗
+              </a>
             </div>
           </div>
 
@@ -1298,7 +1306,7 @@ export default function App() {
                   {attestationMode === 'onchain' ? (
                     <div className="space-y-2 pt-1.5 border-t border-[#F5F2ED]/10 text-[11px] text-emerald-400 font-sans">
                       <p className="leading-relaxed">
-                        <strong>Base Sepolia Testnet active:</strong> The attestation payload is compiled as custom hex data, and MetaMask will trigger a live blockchain transaction.
+                        <strong>Base Sepolia Testnet active:</strong> The attestation payload is compiled as custom hex data, and MetaMask will trigger a live blockchain transaction. Verify assets on the official <a href="https://testnet.explorer.intuition.systems/" target="_blank" rel="noopener noreferrer" className="underline font-bold text-emerald-300 hover:text-emerald-200">Intuition Explorer ↗</a>.
                       </p>
                       
                       <div>
@@ -1670,7 +1678,18 @@ export default function App() {
                   {selectedAtomName ? (
                     <div className="space-y-6">
                       <div className="pb-3 border-b border-[#F5F2ED]/10">
-                        <span className="text-[10px] text-[#F5F2ED]/40 uppercase tracking-widest font-sans">Current Subject</span>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-[#F5F2ED]/40 uppercase tracking-widest font-sans">Current Subject</span>
+                          <a 
+                            href="https://testnet.explorer.intuition.systems/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[9px] font-mono text-[#C5A880] hover:text-[#e4c295] underline flex items-center gap-1 transition-all uppercase tracking-wide"
+                            title="Open the official Intuition Testnet Explorer"
+                          >
+                            Explore Testnet ↗
+                          </a>
+                        </div>
                         <h3 className="text-2xl font-light font-serif text-[#F5F2ED] mt-1">
                           {atoms.find(a => a.name === selectedAtomName)?.displayName || selectedAtomName}
                         </h3>
