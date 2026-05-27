@@ -127,6 +127,22 @@ function parsePathNodeToId(name: string, nodes: GraphNode[]): string {
   return lowercase;
 }
 
+async function safeFetchJson(url: string, options?: RequestInit): Promise<any> {
+  const res = await fetch(url, options);
+  if (!res.ok) {
+    throw new Error(`HTTP Error Status ${res.status} trying to reach ${url}`);
+  }
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType && (contentType.includes('text/html') || contentType.includes('text/plain'))) {
+    throw new Error(`Invalid content-type "${contentType}" returned from ${url}. Expected JSON payload.`);
+  }
+  try {
+    return await res.json();
+  } catch (parseErr: any) {
+    throw new Error(`Failed to parse JSON response from ${url}: ${parseErr.message}`);
+  }
+}
+
 export default function App() {
   // Navigation
   const [activeTab, setActiveTab] = useState<'graph' | 'ledger' | 'simulator'>('graph');
@@ -183,8 +199,7 @@ export default function App() {
         return;
       }
       try {
-        const response = await fetch(`/api/telegram/status/${walletAddress}`);
-        const data = await response.json();
+        const data = await safeFetchJson(`/api/telegram/status/${walletAddress}`);
         if (data.success) {
           setTelegramLinkedUser(data.telegramUser);
           if (data.telegramUser) {
@@ -215,12 +230,11 @@ export default function App() {
     if (!walletAddress) return;
     setIsGeneratingCode(true);
     try {
-      const res = await fetch('/api/telegram/generate-code', {
+      const data = await safeFetchJson('/api/telegram/generate-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ walletAddress })
       });
-      const data = await res.json();
       if (data.success) {
         setTelegramCode(data.code);
       } else {
@@ -238,12 +252,11 @@ export default function App() {
     if (!walletAddress) return;
     if (!confirm("Are you sure you want to decouple this Telegram account from your Web3 address?")) return;
     try {
-      const res = await fetch('/api/telegram/unlink', {
+      const data = await safeFetchJson('/api/telegram/unlink', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ walletAddress })
       });
-      const data = await res.json();
       if (data.success) {
         setTelegramLinkedUser(null);
         setTelegramCode(null);
@@ -256,7 +269,17 @@ export default function App() {
   // Auto connect on mount if selectedAddress is ready
   useEffect(() => {
     const checkAlreadyConnected = async () => {
-      const eth = (window as any).ethereum;
+      let eth = (window as any).ethereum;
+      if (!eth) return;
+
+      // Address multi-provider collision (e.g., both MetaMask and Coinbase are installed)
+      if (eth.providers && Array.isArray(eth.providers)) {
+        const metamaskProvider = eth.providers.find((p: any) => p.isMetaMask);
+        if (metamaskProvider) {
+          eth = metamaskProvider;
+        }
+      }
+
       if (eth && eth.selectedAddress) {
         try {
           const provider = new BrowserProvider(eth);
@@ -285,14 +308,44 @@ export default function App() {
   }, []);
 
   async function connectWallet() {
-    const eth = (window as any).ethereum;
+    let eth = (window as any).ethereum;
+
+    // Resolve MetaMask if multiple wallets are installed
+    if (eth && eth.providers && Array.isArray(eth.providers)) {
+      const metamaskProvider = eth.providers.find((p: any) => p.isMetaMask);
+      if (metamaskProvider) {
+        eth = metamaskProvider;
+      }
+    }
+
+    // Check if we are inside an embedded iframe and missing ethereum
+    const isIframe = window.self !== window.top;
     if (!eth) {
-      alert("No Ethereum browser wallet detected. Please install MetaMask or Coinbase Wallet to sign attestations!");
+      if (isIframe) {
+        const confirmOpen = window.confirm(
+          "We detected you are viewing this application inside the embedded AI Studio simulator.\n\n" +
+          "Browser extensions like MetaMask cannot connect inside embedded iframes due to security policies.\n\n" +
+          "Click OK to open the app in a new, secure browser tab so you can connect your MetaMask extension and sign attestations!"
+        );
+        if (confirmOpen) {
+          window.open(window.location.href, '_blank');
+        }
+        return;
+      }
+
+      // regular window but still no ethereum
+      const confirmInstall = window.confirm(
+        "No Ethereum browser extension like MetaMask was found in this browser.\n\n" +
+        "Would you like to visit MetaMask's website to download and install the extension?"
+      );
+      if (confirmInstall) {
+        window.open("https://metamask.io/download/", "_blank");
+      }
       return;
     }
+
     setIsWalletConnecting(true);
     try {
-      const provider = new BrowserProvider(eth);
       const accounts = await eth.request({ method: 'eth_requestAccounts' });
       if (accounts && accounts.length > 0) {
         const address = accounts[0];
@@ -303,7 +356,7 @@ export default function App() {
         else if (eth.isCoinbaseWallet) detectedType = 'Coinbase';
         setWalletType(detectedType);
 
-        // Autofill "Citizen Stakeholder" field with their beautiful short address or handle!
+        // Autofill "Citizen Stakeholder" field with address
         setCreateAttForm(prev => ({
           ...prev,
           fromUser: `${address.slice(0, 6)}...${address.slice(-4)}`
@@ -311,6 +364,7 @@ export default function App() {
       }
     } catch (err: any) {
       console.error("Connect wallet failed", err);
+      alert(`Connection failed: ${err.message || err}\n\nPlease verify your MetaMask window popup or check that the wallet is unlocked.`);
     } finally {
       setIsWalletConnecting(false);
     }
@@ -354,12 +408,12 @@ export default function App() {
     setIsSyncing(true);
     setSyncStatus('Initiating handshake with Intuition Mainnet (Base L2)...');
     try {
-      const response = await fetch('/api/sync-intuition', {
+      const response = await safeFetchJson('/api/sync-intuition', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         }
-      }).then(r => r.json());
+      });
 
       if (response.success && response.stats) {
         const stats = response.stats;
@@ -407,12 +461,13 @@ export default function App() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Initialize and load
-  async function loadData() {
+  // Initialize and load with automatic retries to handle dev-server startup/cold-starts
+  async function loadData(retryCount = 0) {
     try {
-      const atomsRes = await fetch('/api/atoms').then(r => r.json());
-      const attestationsRes = await fetch('/api/attestations').then(r => r.json());
-      const statsRes = await fetch('/api/statistics').then(r => r.json());
-      const graphRes = await fetch('/api/graph').then(r => r.json());
+      const atomsRes = await safeFetchJson('/api/atoms');
+      const attestationsRes = await safeFetchJson('/api/attestations');
+      const statsRes = await safeFetchJson('/api/statistics');
+      const graphRes = await safeFetchJson('/api/graph');
 
       if (atomsRes.success) setAtoms(atomsRes.atoms);
       if (attestationsRes.success) setAttestations(attestationsRes.attestations);
@@ -424,8 +479,12 @@ export default function App() {
         setGraphNodes(arrangedNodes);
         setGraphLinks(graphRes.links);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error loading API data', err);
+      if (retryCount < 5) {
+        console.log(`Retrying API load in 2s (attempt ${retryCount + 1}/5)...`);
+        setTimeout(() => loadData(retryCount + 1), 2000);
+      }
     }
   }
 
@@ -477,22 +536,25 @@ export default function App() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatLog, isBotTyping]);
 
-  const fetchGraphIntelligence = async (name: string) => {
+  const fetchGraphIntelligence = async (name: string, retryCount = 0) => {
     setIsIntelligenceLoading(true);
     try {
-      const res = await fetch(`/api/intelligence/${encodeURIComponent(name.toLowerCase())}`).then(r => {
-        if (!r.ok) {
-          throw new Error(`Server returned status ${r.status}`);
-        }
-        return r.json();
-      });
+      const res = await safeFetchJson(`/api/intelligence/${encodeURIComponent(name.toLowerCase())}`);
       if (res && res.success && res.intelligence) {
         setGraphIntelligence(res.intelligence);
       } else {
         throw new Error(res?.error || 'Database did not return intelligence data');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching graph intelligence, using local fallback:', err);
+      
+      // Auto-retry on network fetch errors
+      if (retryCount < 3) {
+        console.log(`Retrying fetchGraphIntelligence in 1.5s (attempt ${retryCount + 1}/3)...`);
+        setTimeout(() => fetchGraphIntelligence(name, retryCount + 1), 1500);
+        return;
+      }
+
       // Construct a beautiful frontend fallback to guarantee consistent data loading
       const targetAtom = atoms.find(a => a.name === name.toLowerCase());
       const displayName = targetAtom ? targetAtom.displayName : name;
@@ -550,18 +612,13 @@ export default function App() {
     }
   };
 
-  const fetchAiExplanation = async (name: string) => {
+  const fetchAiExplanation = async (name: string, retryCount = 0) => {
     setIsExplaining(true);
     try {
-      const res = await fetch('/api/ai-explain', {
+      const res = await safeFetchJson('/api/ai-explain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ entityName: name })
-      }).then(r => {
-        if (!r.ok) {
-          throw new Error(`Server returned status ${r.status}`);
-        }
-        return r.json();
       });
 
       if (res && res.success && res.explanation) {
@@ -569,8 +626,16 @@ export default function App() {
       } else {
         throw new Error(res?.error || 'Server did not return a successful AI explanation');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load AI breakdown, using local fallback:', err);
+      
+      // Auto-retry on network fetch errors
+      if (retryCount < 3) {
+        console.log(`Retrying fetchAiExplanation in 1.5s (attempt ${retryCount + 1}/3)...`);
+        setTimeout(() => fetchAiExplanation(name, retryCount + 1), 1500);
+        return;
+      }
+
       // Construct an elegant client-side heuristic fallback so the UI never displays as empty or broken
       const targetAtom = atoms.find(a => a.name === name.toLowerCase());
       const displayName = targetAtom ? targetAtom.displayName : name;
@@ -622,7 +687,7 @@ export default function App() {
     if (!createAtomForm.displayName) return;
 
     try {
-      const res = await fetch('/api/atoms', {
+      const res = await safeFetchJson('/api/atoms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -631,7 +696,7 @@ export default function App() {
           description: createAtomForm.description,
           creator: 'dashboard-ui'
         })
-      }).then(r => r.json());
+      });
 
       if (res.success) {
         setCreateAtomForm({ displayName: '', type: 'project', description: '' });
@@ -652,7 +717,16 @@ export default function App() {
     if (walletAddress) {
       setSigningState('Please sign the attestation assertion in your wallet popup...');
       try {
-        const eth = (window as any).ethereum;
+        let eth = (window as any).ethereum;
+        
+        // Resolve MetaMask if multiple wallets are installed
+        if (eth && eth.providers && Array.isArray(eth.providers)) {
+          const metamaskProvider = eth.providers.find((p: any) => p.isMetaMask);
+          if (metamaskProvider) {
+            eth = metamaskProvider;
+          }
+        }
+
         if (!eth) {
           throw new Error('Ethereum provider was disconnected');
         }
@@ -680,7 +754,7 @@ export default function App() {
     }
 
     try {
-      const res = await fetch('/api/attestations', {
+      const res = await safeFetchJson('/api/attestations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -691,7 +765,7 @@ export default function App() {
           signature,
           wallet_address: signingWallet
         })
-      }).then(r => r.json());
+      });
 
       if (res.success) {
         setCreateAttForm({
@@ -725,14 +799,14 @@ export default function App() {
     setIsBotTyping(true);
 
     try {
-      const res = await fetch('/api/bot/simulate', {
+      const res = await safeFetchJson('/api/bot/simulate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text: userText,
           fromUser: simulatorUser
         })
-      }).then(r => r.json());
+      });
 
       setTimeout(() => {
         setIsBotTyping(false);
