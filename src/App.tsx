@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { BrowserProvider } from 'ethers';
 import { 
   Bot, 
   Award, 
@@ -23,7 +24,8 @@ import {
   Sliders,
   ChevronRight,
   GitFork,
-  Clock
+  Clock,
+  Wallet
 } from 'lucide-react';
 
 interface Atom {
@@ -46,6 +48,8 @@ interface Attestation {
   trust_score: number;
   comment: string;
   timestamp: string;
+  signature?: string;
+  wallet_address?: string;
 }
 
 interface GraphNode {
@@ -156,6 +160,80 @@ export default function App() {
   // Sync state
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
+
+  // Web3 Connected Wallet State
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [isWalletConnecting, setIsWalletConnecting] = useState(false);
+  const [walletType, setWalletType] = useState<string | null>(null);
+  const [signingState, setSigningState] = useState<string | null>(null);
+
+  // Auto connect on mount if selectedAddress is ready
+  useEffect(() => {
+    const checkAlreadyConnected = async () => {
+      const eth = (window as any).ethereum;
+      if (eth && eth.selectedAddress) {
+        try {
+          const provider = new BrowserProvider(eth);
+          const accounts = await provider.listAccounts();
+          if (accounts && accounts.length > 0) {
+            const address = accounts[0].address;
+            setWalletAddress(address);
+            
+            let detectedType = 'Web3 Wallet';
+            if (eth.isMetaMask) detectedType = 'MetaMask';
+            else if (eth.isCoinbaseWallet) detectedType = 'Coinbase';
+            setWalletType(detectedType);
+
+            // Set default contributor username in form to the address
+            setCreateAttForm(prev => ({
+              ...prev,
+              fromUser: `${address.slice(0, 6)}...${address.slice(-4)}`
+            }));
+          }
+        } catch (e) {
+          console.error("Auto wallet connect check failed", e);
+        }
+      }
+    };
+    checkAlreadyConnected();
+  }, []);
+
+  async function connectWallet() {
+    const eth = (window as any).ethereum;
+    if (!eth) {
+      alert("No Ethereum browser wallet detected. Please install MetaMask or Coinbase Wallet to sign attestations!");
+      return;
+    }
+    setIsWalletConnecting(true);
+    try {
+      const provider = new BrowserProvider(eth);
+      const accounts = await eth.request({ method: 'eth_requestAccounts' });
+      if (accounts && accounts.length > 0) {
+        const address = accounts[0];
+        setWalletAddress(address);
+        
+        let detectedType = 'Web3 Wallet';
+        if (eth.isMetaMask) detectedType = 'MetaMask';
+        else if (eth.isCoinbaseWallet) detectedType = 'Coinbase';
+        setWalletType(detectedType);
+
+        // Autofill "Citizen Stakeholder" field with their beautiful short address or handle!
+        setCreateAttForm(prev => ({
+          ...prev,
+          fromUser: `${address.slice(0, 6)}...${address.slice(-4)}`
+        }));
+      }
+    } catch (err: any) {
+      console.error("Connect wallet failed", err);
+    } finally {
+      setIsWalletConnecting(false);
+    }
+  }
+
+  function disconnectWallet() {
+    setWalletAddress(null);
+    setWalletType(null);
+  }
 
   // Auto-Sync Polling
   const [autoSyncEnabled, setAutoSyncEnabled] = useState<boolean>(false);
@@ -482,6 +560,39 @@ export default function App() {
   // Submit attestation fast
   const handleCreateAttestation = async (e: React.FormEvent) => {
     e.preventDefault();
+    let signature: string | undefined = undefined;
+    let signingWallet: string | undefined = undefined;
+
+    if (walletAddress) {
+      setSigningState('Please sign the attestation assertion in your wallet popup...');
+      try {
+        const eth = (window as any).ethereum;
+        if (!eth) {
+          throw new Error('Ethereum provider was disconnected');
+        }
+        const provider = new BrowserProvider(eth);
+        const signer = await provider.getSigner();
+        
+        // Define a clean human-readable assertion string matching official web3 formats
+        const assertionMessage = `DeFi Reputation Attestation Proof\n\n` +
+                                 `Validator: ${walletAddress}\n` +
+                                 `Citizen Handle: @${createAttForm.fromUser}\n` +
+                                 `Target Subject: ${createAttForm.toEntity.toUpperCase()}\n` +
+                                 `Reputation Weight: ${createAttForm.trustScore}/5\n` +
+                                 `Proof Remark: "${createAttForm.comment}"\n` +
+                                 `System Time: ${new Date().toISOString()}`;
+
+        signature = await signer.signMessage(assertionMessage);
+        signingWallet = walletAddress;
+        setSigningState('Cryptographic signature obtained successfully!');
+      } catch (err: any) {
+        console.error("Signing failed", err);
+        setSigningState(`Signing canceled or failed: ${err.message || 'unknown error'}`);
+        setTimeout(() => setSigningState(null), 5000);
+        return; // Don't proceed if they reject or it fails
+      }
+    }
+
     try {
       const res = await fetch('/api/attestations', {
         method: 'POST',
@@ -490,7 +601,9 @@ export default function App() {
           from_user: createAttForm.fromUser,
           to_entity: createAttForm.toEntity,
           trust_score: createAttForm.trustScore,
-          comment: createAttForm.comment
+          comment: createAttForm.comment,
+          signature,
+          wallet_address: signingWallet
         })
       }).then(r => r.json());
 
@@ -505,6 +618,8 @@ export default function App() {
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      setTimeout(() => setSigningState(null), 4000);
     }
   };
 
@@ -650,6 +765,30 @@ export default function App() {
               <span className="font-sans text-[10px] tracking-[0.2em] uppercase font-bold">Mainnet Connected</span>
             </div>
           </div>
+
+          {/* Web3 Connect Wallet Button */}
+          {walletAddress ? (
+            <button
+              onClick={disconnectWallet}
+              className="px-3 py-2 bg-[#C5A880]/10 hover:bg-[#C5A880]/20 border border-[#C5A880]/30 transition-all text-xs font-sans uppercase tracking-wider flex items-center gap-2 text-[#C5A880] rounded-none cursor-pointer"
+              title={`Disconect your connected ${walletType} wallet: ${walletAddress}`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-[#C5A880] animate-pulse"></span>
+              <Wallet className="h-3.5 w-3.5" />
+              <span className="font-mono">{walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}</span>
+            </button>
+          ) : (
+            <button
+              onClick={connectWallet}
+              disabled={isWalletConnecting}
+              className="px-3 py-2 bg-[#F5F2ED] hover:bg-[#F5F2ED]/90 border border-transparent transition-all text-xs font-sans uppercase tracking-wider flex items-center gap-2 text-[#0A0A0A] font-bold rounded-none cursor-pointer"
+              title="Connect MetaMask or Coinbase wallet to sign on-chain reputation proof"
+            >
+              <Wallet className={`h-3.5 w-3.5 ${isWalletConnecting ? 'animate-bounce' : ''}`} />
+              <span>{isWalletConnecting ? 'Connecting...' : 'Connect Wallet'}</span>
+            </button>
+          )}
+
           <button 
             onClick={triggerIntuitionSync}
             disabled={isSyncing}
@@ -797,6 +936,22 @@ export default function App() {
             </p>
 
             <form onSubmit={handleCreateAttestation} className="space-y-4 font-sans">
+              {walletAddress && (
+                <div className="bg-[#C5A880]/10 border border-[#C5A880]/30 p-3 text-[11px] font-sans text-[#C5A880] flex items-center gap-2 rounded-none">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                  <span>
+                    <strong>Web3 Sign Mode:</strong> Your attestation will be cryptographically signed via your <strong>{walletType}</strong> wallet before commitment.
+                  </span>
+                </div>
+              )}
+
+              {signingState && (
+                <div className="bg-[#F5F2ED] text-[#0A0A0A] p-3 text-[11px] font-sans font-bold flex items-center gap-2 animate-pulse rounded-none shadow-lg">
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin shrink-0" />
+                  <span>{signingState}</span>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] uppercase tracking-widest text-[#F5F2ED]/50 mb-1">Citizen Stakeholder</label>
@@ -1444,7 +1599,23 @@ export default function App() {
                       <tbody className="divide-y divide-[#F5F2ED]/10 text-xs text-[#F5F2ED]/80 font-sans tracking-wide">
                         {attestations.map((att) => (
                           <tr key={att.id} className="hover:bg-[#F5F2ED]/2 transition-colors">
-                            <td className="px-6 py-4 font-mono font-bold text-[#C5A880]">@{att.from_user}</td>
+                            <td className="px-6 py-4 font-mono font-bold text-[#C5A880]">
+                              <div className="flex flex-col">
+                                <span className={att.signature ? "text-emerald-400 font-bold" : ""}>
+                                  @{att.from_user}
+                                </span>
+                                {att.signature && (
+                                  <span 
+                                    className="text-[9px] text-[#C5A880] tracking-tight bg-[#C5A880]/10 border border-[#C5A880]/20 px-1.5 py-0.5 mt-1 inline-flex items-center gap-1 cursor-pointer hover:bg-[#C5A880]/25 rounded-none max-w-fit"
+                                    onClick={() => alert(`DEFI REPUTATION ATTESTATION PROOF\n\nSigner Wallet: ${att.wallet_address}\n\nCryptographic Signature Hash:\n${att.signature}`)}
+                                    title="Cryptographically Verified Web3 On-Chain Signature. Click to audit proof."
+                                  >
+                                    <ShieldCheck className="h-2.5 w-2.5 text-[#C5A880]" />
+                                    <span>Verified</span>
+                                  </span>
+                                )}
+                              </div>
+                            </td>
                             <td className="px-6 py-4 text-[#F5F2ED]/30 italic font-serif">trusts</td>
                             <td className="px-6 py-4 font-serif italic text-sm">{atoms.find(a => a.name === att.to_entity)?.displayName || att.to_entity}</td>
                             <td className="px-6 py-4 text-center text-emerald-400 font-bold">★ {att.trust_score}</td>

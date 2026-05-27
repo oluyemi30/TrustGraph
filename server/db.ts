@@ -18,6 +18,8 @@ export interface Attestation {
   trust_score: number; // 1-5
   comment: string;
   timestamp: string;
+  signature?: string;
+  wallet_address?: string;
 }
 
 export interface Triple {
@@ -243,7 +245,7 @@ class DatabaseEngine {
     return newAtom;
   }
 
-  public addAttestation(fromUser: string, toEntityName: string, trustScore: number, comment: string): Attestation {
+  public addAttestation(fromUser: string, toEntityName: string, trustScore: number, comment: string, signature?: string, walletAddress?: string): Attestation {
     const cleanFrom = fromUser.trim().replace(/^@/, '');
     const cleanTo = toEntityName.trim();
     const cleanToKey = cleanTo.toLowerCase();
@@ -267,6 +269,8 @@ class DatabaseEngine {
       this.attestations[existingIdx].trust_score = Math.min(5, Math.max(1, trustScore));
       this.attestations[existingIdx].comment = comment || 'Updated trust attestation comment.';
       this.attestations[existingIdx].timestamp = new Date().toISOString();
+      if (signature) this.attestations[existingIdx].signature = signature;
+      if (walletAddress) this.attestations[existingIdx].wallet_address = walletAddress;
 
       this.rebuildTriples();
       this.intelCache.clear();
@@ -281,7 +285,9 @@ class DatabaseEngine {
       to_entity: targetAtom.name,
       trust_score: Math.min(5, Math.max(1, trustScore)),
       comment: comment || 'Staked trust without custom comment.',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      signature,
+      wallet_address: walletAddress
     };
 
     this.attestations.push(newAtt);

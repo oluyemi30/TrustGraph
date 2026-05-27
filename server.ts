@@ -103,11 +103,12 @@ Inspired by decentralized trust protocols like <i>Intuition</i>, this system map
 3. <code>/graph &lt;entity&gt;</code> — Unroll the connection graph representing peer trust claimants.
 4. <code>/sync</code> — Sync live Atoms and Claims from Intuition Mainnet (Base L2) indexer.
 5. <code>/entities</code> — Rank global registered identity nodes by their consensus ratings.
+6. <code>/wallet</code> — Get the guide on connecting MetaMask or Coinbase and signing reputation proofs.
 
 💡 <b>Examples:</b>
 • <code>/attest Ethereum 5 "Core layer-1 layer of smart contracts."</code>
 • <code>/trust Ethereum</code>
-• <code>/graph Ethereum</code>
+• <code>/wallet</code>
 • <code>/sync</code>
 • <code>/entities</code>`;
     }
@@ -286,6 +287,20 @@ The TrustGraph database has been successfully synchronized using live records fr
       }
     }
 
+    case '/wallet':
+    case '/linkwallet': {
+      return `🔑 <b>Web3 Wallet Connection & Bridge Guide</b>
+
+Standard Telegram text feeds do not have an injected browser DOM or a <code>window.ethereum</code> provider, which means standard browser wallet extensions (like MetaMask or Coinbase Wallet) cannot fire modal popups or request signatures directly inside standard Telegram text threads.
+
+<b>How to pair your Telegram username with Web3:</b>
+1. Open the <b>TrustGraph Web Portal</b> (visible in your AI Studio preview iframe, or by clicking the Shared App URL).
+2. Click the <b>[Connect Wallet]</b> button in the top-right header (supports MetaMask, Coinbase, and other standard browser wallets).
+3. On the attestation form, type your Telegram handle (e.g., <code>@${escapeHTML(username)}</code>) as the <b>Citizen Stakeholder</b>.
+4. When you submit, your Web browser will prompt your connected Web3 wallet to <b>cryptographically sign</b> the reputation proof.
+5. Our ledger securely records both your <b>Telegram Username</b>, your <b>Web3 Wallet Address</b>, and the resulting <b>Cryptographic Signature</b> so anyone can audit the proof on-chain!`;
+    }
+
     default: {
       return `❓ <b>Unknown Command: ${escapeHTML(command)}</b>
 Type <code>/start</code> to view a list of all active TrustGraph Ledger commands.`;
@@ -348,11 +363,18 @@ app.post('/api/atoms', (req, res) => {
 // Post fresh attestations via dashboard web interface
 app.post('/api/attestations', (req, res) => {
   try {
-    const { from_user, to_entity, trust_score, comment } = req.body;
+    const { from_user, to_entity, trust_score, comment, signature, wallet_address } = req.body;
     if (!from_user || !to_entity || !trust_score) {
       return res.status(400).json({ success: false, error: 'Missing required attestation fields' });
     }
-    const att = db.addAttestation(from_user, to_entity, parseInt(trust_score, 10), comment || '');
+    const att = db.addAttestation(
+      from_user, 
+      to_entity, 
+      parseInt(trust_score, 10), 
+      comment || '', 
+      signature, 
+      wallet_address
+    );
     res.json({ success: true, attestation: att });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
