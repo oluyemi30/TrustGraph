@@ -25,7 +25,8 @@ import {
   ChevronRight,
   GitFork,
   Clock,
-  Wallet
+  Wallet,
+  Settings
 } from 'lucide-react';
 
 interface Atom {
@@ -128,7 +129,12 @@ function parsePathNodeToId(name: string, nodes: GraphNode[]): string {
 }
 
 async function safeFetchJson(url: string, options?: RequestInit): Promise<any> {
-  const res = await fetch(url, options);
+  const customBase = typeof window !== 'undefined' ? (localStorage.getItem('TRUSTGRAPH_API_URL') || '').trim() : '';
+  const cleanBase = customBase.endsWith('/') ? customBase.slice(0, -1) : customBase;
+  const cleanUrl = url.startsWith('/') ? url : '/' + url;
+  const targetUrl = cleanBase ? `${cleanBase}${cleanUrl}` : url;
+
+  const res = await fetch(targetUrl, options);
   if (!res.ok) {
     throw new Error(`HTTP Error Status ${res.status} trying to reach ${url}`);
   }
@@ -190,6 +196,12 @@ export default function App() {
   const [telegramCode, setTelegramCode] = useState<string | null>(null);
   const [telegramLinkedUser, setTelegramLinkedUser] = useState<string | null>(null);
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+
+  // Custom API configuration for multi-host and self-hosted static environments
+  const [customApiUrl, setCustomApiUrl] = useState<string>(() => {
+    return typeof window !== 'undefined' ? (localStorage.getItem('TRUSTGRAPH_API_URL') || '') : '';
+  });
+  const [showApiSettings, setShowApiSettings] = useState<boolean>(false);
 
   // Check Telegram bridge link status
   useEffect(() => {
@@ -1215,6 +1227,73 @@ export default function App() {
                     )}
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+
+          {/* Custom API Gateway Settings Panel */}
+          <div className="bg-[#F5F2ED]/5 border border-[#F5F2ED]/10 p-6 rounded-none relative">
+            <div className="flex items-center justify-between border-b border-[#F5F2ED]/10 pb-2 mb-4">
+              <h2 className="text-xs uppercase tracking-[0.2em] font-sans text-[#C5A880] flex items-center gap-2">
+                <Settings className="h-4 w-4 text-[#C5A880]" />
+                API Server Gateway
+              </h2>
+              <button
+                onClick={() => setShowApiSettings(!showApiSettings)}
+                className="text-[10px] uppercase font-bold text-[#F5F2ED]/50 hover:text-[#F5F2ED] underline cursor-pointer"
+              >
+                {showApiSettings ? 'Hide' : 'Configure ⚙️'}
+              </button>
+            </div>
+
+            {showApiSettings ? (
+              <div className="space-y-4 font-sans text-xs">
+                <p className="text-[#F5F2ED]/60 leading-relaxed">
+                  If hosting this frontend statically (e.g. Netlify/Vercel) separate from the server, input your hosted TrustGraph backend endpoint here to link everything up natively:
+                </p>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest text-[#F5F2ED]/40 block">Server API URL</label>
+                  <input
+                    type="text"
+                    value={customApiUrl}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setCustomApiUrl(value);
+                      localStorage.setItem('TRUSTGRAPH_API_URL', value.trim());
+                    }}
+                    placeholder="e.g. https://my-trustgraph-api.render.com"
+                    className="w-full bg-[#0A0A0A] border border-[#F5F2ED]/20 px-3 py-2 text-xs font-mono text-[#F5F2ED] placeholder-[#F5F2ED]/25 focus:outline-none focus:border-sky-400"
+                  />
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-[9px] text-[#F5F2ED]/40">Status: {customApiUrl ? '🛰️ Redirected Gateway' : '🏠 Native Localhost Proxy'}</span>
+                    {customApiUrl && (
+                      <button
+                        onClick={() => {
+                          setCustomApiUrl('');
+                          localStorage.setItem('TRUSTGRAPH_API_URL', '');
+                          loadData();
+                        }}
+                        className="text-[9px] uppercase tracking-wider text-red-400 hover:underline cursor-pointer font-bold"
+                      >
+                        Reset Local
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={async () => {
+                    await loadData();
+                    alert("API gateway target updated successfully. Initiated dynamic refresh of ledger records.");
+                  }}
+                  className="w-full py-1.5 bg-[#C5A880]/10 hover:bg-[#C5A880]/20 border border-[#C5A880]/30 text-[#C5A880] font-sans text-[10px] font-bold uppercase tracking-widest transition-all cursor-pointer"
+                >
+                  Test Connection & Re-Sync
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between text-[11px] text-[#F5F2ED]/50">
+                <span>Target: {customApiUrl ? <code className="text-yellow-400 font-mono text-[10px]">{customApiUrl.replace(/^https?:\/\//, '')}</code> : <code className="text-[#F5F2ED]/40 font-mono text-[10px]">Local/Relative Web Proxies</code>}</span>
+                <span className="text-emerald-400 font-bold">• Active</span>
               </div>
             )}
           </div>
