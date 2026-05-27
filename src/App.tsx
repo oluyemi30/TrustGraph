@@ -167,6 +167,92 @@ export default function App() {
   const [walletType, setWalletType] = useState<string | null>(null);
   const [signingState, setSigningState] = useState<string | null>(null);
 
+  // Telegram Integration States
+  const [telegramCode, setTelegramCode] = useState<string | null>(null);
+  const [telegramLinkedUser, setTelegramLinkedUser] = useState<string | null>(null);
+  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+
+  // Check Telegram bridge link status
+  useEffect(() => {
+    let interval: any = null;
+    
+    const checkStatus = async () => {
+      if (!walletAddress) {
+        setTelegramLinkedUser(null);
+        setTelegramCode(null);
+        return;
+      }
+      try {
+        const response = await fetch(`/api/telegram/status/${walletAddress}`);
+        const data = await response.json();
+        if (data.success) {
+          setTelegramLinkedUser(data.telegramUser);
+          if (data.telegramUser) {
+            // Once linked, clear any pending code display
+            setTelegramCode(null);
+          }
+        }
+      } catch (err) {
+        console.error("Error checking telegram status", err);
+      }
+    };
+
+    if (walletAddress) {
+      checkStatus();
+      // Poll every 5 seconds so when they type /activate in Telegram, the Web UI automatically updates!
+      interval = setInterval(checkStatus, 5000);
+    } else {
+      setTelegramLinkedUser(null);
+      setTelegramCode(null);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [walletAddress]);
+
+  const generateTelegramCode = async () => {
+    if (!walletAddress) return;
+    setIsGeneratingCode(true);
+    try {
+      const res = await fetch('/api/telegram/generate-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setTelegramCode(data.code);
+      } else {
+        alert(data.error || "Failed to generate activation code.");
+      }
+    } catch (err) {
+      console.error("Error generating code", err);
+      alert("Error generating code. Please verify server connection.");
+    } finally {
+      setIsGeneratingCode(false);
+    }
+  };
+
+  const unlinkTelegram = async () => {
+    if (!walletAddress) return;
+    if (!confirm("Are you sure you want to decouple this Telegram account from your Web3 address?")) return;
+    try {
+      const res = await fetch('/api/telegram/unlink', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setTelegramLinkedUser(null);
+        setTelegramCode(null);
+      }
+    } catch (err) {
+      console.error("Error unlinking telegram", err);
+    }
+  };
+
   // Auto connect on mount if selectedAddress is ready
   useEffect(() => {
     const checkAlreadyConnected = async () => {
@@ -297,7 +383,7 @@ export default function App() {
   const [chatLog, setChatLog] = useState<ChatMessage[]>([
     {
       sender: 'bot',
-      text: `🤖 *Welcome to the TrustGraph interactive simulator!* \n\nType commands in the input field below to interact with the underlying ledger in real-time, matching standard **Telegram Bot API commands**:\n\n• \`/start\` — Learn about the TrustGraph architecture\n• \`/attest <entity> <score 1-5> <comment>\` — Stake a trust claim (Triple)\n• \`/trust <entity>\` — Request consensus & call **Gemini AI Analysis**\n• \`/graph <entity>\` — Trace connection triples\n• \`/entities\` — Rank registered ledger atoms`,
+      text: `🤖 *Welcome to the TrustGraph interactive simulator!* \n\nType commands in the input field below to interact with the underlying ledger in real-time, matching standard **Telegram Bot API commands**:\n\n• \`/start\` — Learn about the TrustGraph architecture\n• \`/activate <code>\` — Kopple your connected Web3 wallet (use code on left side)\n• \`/attest <entity> <score 1-5> <comment>\` — Stake a trust claim (Signed if linked to Web3)\n• \`/tx stake <entity> <amount>\` — Stake CTZN consensus tokens (Linked Web3 account required)\n• \`/trust <entity>\` — Request consensus & call **Gemini AI Analysis**\n• \`/graph <entity>\` — Trace connection triples\n• \`/entities\` — Rank registered ledger atoms\n• \`/wallet\` — Inspect Web3 Wallet connection status`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
   ]);
@@ -855,6 +941,92 @@ export default function App() {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Telegram Web3 Bridge Panel */}
+          <div className="bg-[#F5F2ED]/5 border border-[#F5F2ED]/10 p-6 rounded-none relative overflow-hidden">
+            <div className="absolute top-0 right-0 h-24 w-24 bg-sky-400/2 rounded-full blur-[35px] pointer-events-none"></div>
+            
+            <h2 className="text-xs uppercase tracking-[0.2em] font-sans text-sky-400 border-b border-[#F5F2ED]/10 pb-2 mb-4 flex items-center gap-2">
+              <Bot className="h-4 w-4 text-sky-400" />
+              Telegram Web3 Bridge
+            </h2>
+
+            {!walletAddress ? (
+              <div className="font-sans text-xs space-y-3">
+                <p className="text-[#F5F2ED]/60 leading-relaxed">
+                  Bridge your decentralized Web3 wallet with your Telegram handle to perform on-chain trust claims, stake tokens, and sign claims entirely via Telegram!
+                </p>
+                <div className="p-3 bg-[#0A0A0A]/40 border border-[#F5F2ED]/10 text-[#F5F2ED]/40 italic text-[11px]">
+                  Please connect your browser wallet (MetaMask / Coinbase) using the button in the header first.
+                </div>
+              </div>
+            ) : (
+              <div className="font-sans text-xs space-y-4">
+                {telegramLinkedUser ? (
+                  <div className="space-y-3">
+                    <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-none text-emerald-400">
+                      <div className="flex items-center gap-2 font-bold mb-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                        Bridge Activated
+                      </div>
+                      <p className="text-[11px] text-[#F5F2ED]/80 leading-relaxed">
+                        Your on-chain address is securely coupled with Telegram handle: <strong>@{telegramLinkedUser}</strong>.
+                      </p>
+                    </div>
+
+                    <div className="p-3 bg-[#0A0A0A]/40 border border-[#F5F2ED]/10 text-[#F5F2ED]/60 space-y-1">
+                      <div className="text-[10px] uppercase tracking-wider text-[#F5F2ED]/40">Active Wallet</div>
+                      <span className="font-mono text-[11px] break-all text-[#F5F2ED]">{walletAddress}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] gap-2">
+                      <span className="text-emerald-400/80">⚡ Live in Telegram Chat!</span>
+                      <button
+                        onClick={unlinkTelegram}
+                        className="text-red-400/80 hover:text-red-400 underline uppercase tracking-wider text-[10px] font-bold cursor-pointer"
+                      >
+                        Unlink
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-[#F5F2ED]/60 leading-relaxed">
+                      Link your wallet <strong>{walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}</strong> with Telegram to permit instant trust/staking on-chain.
+                    </p>
+
+                    {telegramCode ? (
+                      <div className="p-4 bg-sky-500/5 border border-sky-400/20 space-y-3">
+                        <div className="text-center">
+                          <span className="text-[10px] uppercase tracking-widest text-sky-400 font-bold block mb-1">YOUR ACTIVATION CODE</span>
+                          <span className="font-mono text-2xl font-bold tracking-widest text-[#F5F2ED] bg-[#0A0A0A]/80 px-4 py-1.5 border border-[#F5F2ED]/25 inline-block">
+                            {telegramCode}
+                          </span>
+                        </div>
+
+                        <div className="text-[11px] text-[#F5F2ED]/80 space-y-2 pt-1 border-t border-[#F5F2ED]/10">
+                          <p className="font-semibold text-sky-400">How to activate:</p>
+                          <ol className="list-decimal pl-4 space-y-1 text-[#F5F2ED]/60 text-[10px]">
+                            <li>Message the Telegram bot.</li>
+                            <li>Type: <code className="text-[#F5F2ED] bg-[#0A0A0A] px-1 py-0.5 font-mono">/activate {telegramCode}</code></li>
+                            <li>Your wallet will link automatically right here.</li>
+                          </ol>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={generateTelegramCode}
+                        disabled={isGeneratingCode}
+                        className="w-full py-2 bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-[#0A0A0A] font-bold text-xs uppercase tracking-wider transition-all rounded-none cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        {isGeneratingCode ? "Generating..." : "Generate Activation Code"}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Atom Forge - Quick manually write entities */}
@@ -1749,6 +1921,33 @@ export default function App() {
                   className="bg-[#0A0A0A] hover:bg-[#F5F2ED]/5 border border-[#F5F2ED]/20 text-[#F5F2ED]/70 hover:text-[#F5F2ED] text-[9px] px-3 py-1 uppercase tracking-widest transition-colors cursor-pointer"
                 >
                   /entities
+                </button>
+                <button 
+                  onClick={() => triggerDemoCommand('/wallet')}
+                  className="bg-[#0A0A0A] hover:bg-sky-500/10 border border-sky-400/30 text-sky-400/80 hover:text-sky-400 text-[9px] px-3 py-1 uppercase tracking-widest transition-colors cursor-pointer"
+                >
+                  /wallet
+                </button>
+                {telegramCode ? (
+                  <button 
+                    onClick={() => triggerDemoCommand(`/activate ${telegramCode}`)}
+                    className="bg-[#0A0A0A] hover:bg-emerald-500/10 border border-emerald-400/30 text-emerald-400/80 hover:text-emerald-400 text-[9px] px-3 py-1 uppercase tracking-widest transition-colors cursor-pointer font-bold"
+                  >
+                    /activate {telegramCode}
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => triggerDemoCommand('/activate ACTV4K')}
+                    className="bg-[#0A0A0A] hover:bg-emerald-500/10 border border-emerald-400/30 text-emerald-400/80 hover:text-emerald-400 text-[9px] px-3 py-1 uppercase tracking-widest transition-colors cursor-pointer animate-pulse"
+                  >
+                    /activate ACTV4K
+                  </button>
+                )}
+                <button 
+                  onClick={() => triggerDemoCommand('/tx stake Ethereum 250')}
+                  className="bg-[#0A0A0A] hover:bg-amber-500/10 border border-amber-400/30 text-amber-400/80 hover:text-amber-400 text-[9px] px-3 py-1 uppercase tracking-widest transition-colors cursor-pointer"
+                >
+                  /tx stake
                 </button>
               </div>
 

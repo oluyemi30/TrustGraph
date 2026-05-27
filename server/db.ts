@@ -1,6 +1,20 @@
 import fs from 'fs';
 import path from 'path';
 
+export interface WalletLink {
+  telegram_user: string;
+  telegram_id?: string;
+  wallet_address: string;
+  linked_at: string;
+}
+
+export interface ActivationCode {
+  code: string;
+  wallet_address: string;
+  created_at: string;
+  expires_at: number;
+}
+
 export interface Atom {
   id: number;
   name: string; // unique, e.g. "binance", "solana" (lowercased internally for matching)
@@ -63,6 +77,8 @@ class DatabaseEngine {
   private atoms: Atom[] = [];
   private attestations: Attestation[] = [];
   private triples: Triple[] = [];
+  private walletLinks: WalletLink[] = [];
+  private activationCodes: ActivationCode[] = [];
   private intelCache = new Map<string, GraphIntelligence>();
 
   constructor() {
@@ -81,7 +97,9 @@ class DatabaseEngine {
         this.atoms = data.atoms || [];
         this.attestations = data.attestations || [];
         this.triples = data.triples || [];
-        console.log(`[Database] Loaded ${this.atoms.length} Atoms, ${this.attestations.length} Attestations, ${this.triples.length} Triples.`);
+        this.walletLinks = data.walletLinks || [];
+        this.activationCodes = data.activationCodes || [];
+        console.log(`[Database] Loaded ${this.atoms.length} Atoms, ${this.attestations.length} Attestations, ${this.triples.length} Triples, ${this.walletLinks.length} Wallet Links.`);
       } catch (err) {
         console.error('[Database] Error reading database.json, initializing fresh.', err);
         this.save();
@@ -181,7 +199,9 @@ class DatabaseEngine {
       fs.writeFileSync(DB_FILE, JSON.stringify({
         atoms: this.atoms,
         attestations: this.attestations,
-        triples: this.triples
+        triples: this.triples,
+        walletLinks: this.walletLinks,
+        activationCodes: this.activationCodes
       }, null, 2), 'utf8');
     } catch (err) {
       console.error('[Database] Error saving DB file:', err);
@@ -667,6 +687,103 @@ class DatabaseEngine {
     }).sort((a, b) => b.average - a.average || b.count - a.count);
 
     return statsList;
+  }
+
+  public getWalletLinks(): WalletLink[] {
+    return this.walletLinks;
+  }
+
+  public getActivationCodes(): ActivationCode[] {
+    return this.activationCodes;
+  }
+
+  public generateActivationCode(walletAddress: string): string {
+    const cleanAddress = walletAddress.trim().toLowerCase();
+    
+    // Clear any existing codes for this wallet to avoid duplicates
+    this.activationCodes = this.activationCodes.filter(
+      c => c.wallet_address.toLowerCase() !== cleanAddress
+    );
+
+    // Generate random 6 character alphanumeric code
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Avoid ambiguous / confusing chars
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+
+    this.activationCodes.push({
+      code,
+      wallet_address: walletAddress.trim(),
+      created_at: new Date().toISOString(),
+      expires_at: Date.now() + 15 * 60 * 1000 // 15 mins expiration
+    });
+
+    this.save();
+    return code;
+  }
+
+  public activateTelegram(code: string, telegramUser: string, telegramId?: string): { success: boolean; walletAddress?: string; error?: string } {
+    const searchCode = code.trim().toUpperCase();
+    const cleanUser = telegramUser.trim().replace(/^@/, '');
+
+    // Cleanup expired codes first
+    const now = Date.now();
+    this.activationCodes = this.activationCodes.filter(c => c.expires_at > now);
+
+    const matchIdx = this.activationCodes.findIndex(c => c.code === searchCode);
+    if (matchIdx === -1) {
+      return { success: false, error: 'Invalid or expired activation code. Please generate a new code on the Web Portal.' };
+    }
+
+    const matched = this.activationCodes[matchIdx];
+    const walletAddress = matched.wallet_address;
+
+    // Remove the used code
+    this.activationCodes.splice(matchIdx, 1);
+
+    // Clear any existing links for this Telegram user or this wallet to maintain 1-to-1 mapping
+    this.walletLinks = this.walletLinks.filter(
+      l => l.telegram_user.toLowerCase() !== cleanUser.toLowerCase() &&
+           l.wallet_address.toLowerCase() !== walletAddress.toLowerCase()
+    );
+
+    // Save the new link
+    this.walletLinks.push({
+      telegram_user: cleanUser,
+      telegram_id: telegramId ? String(telegramId) : undefined,
+      wallet_address: walletAddress,
+      linked_at: new Date().toISOString()
+    });
+
+    // Also auto-create/update user atom for credibility tracking if needed
+    this.createAtom(cleanUser, 'user', `Citizen Intuition Stakeholder linked with wallet ${walletAddress}`, 'system');
+
+    this.save();
+    return { success: true, walletAddress };
+  }
+
+  public getLinkedWallet(telegramUser: string): string | undefined {
+    const cleanUser = telegramUser.trim().replace(/^@/, '').toLowerCase();
+    const link = this.walletLinks.find(l => l.telegram_user.toLowerCase() === cleanUser);
+    return link ? link.wallet_address : undefined;
+  }
+
+  public getTelegramUserForWallet(walletAddress: string): string | undefined {
+    const cleanAddr = walletAddress.trim().toLowerCase();
+    const link = this.walletLinks.find(l => l.wallet_address.toLowerCase() === cleanAddr);
+    return link ? link.telegram_user : undefined;
+  }
+
+  public unlinkWallet(walletAddress: string): boolean {
+    const cleanAddr = walletAddress.trim().toLowerCase();
+    const initialLen = this.walletLinks.length;
+    this.walletLinks = this.walletLinks.filter(l => l.wallet_address.toLowerCase() !== cleanAddr);
+    if (this.walletLinks.length !== initialLen) {
+      this.save();
+      return true;
+    }
+    return false;
   }
 }
 
