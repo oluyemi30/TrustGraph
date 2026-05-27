@@ -211,7 +211,7 @@ export default function App() {
           }
         }
       } catch (err) {
-        console.error("Error checking telegram status", err);
+        // Silently capture and ignore polling network updates to avoid console pollution
       }
     };
 
@@ -228,6 +228,33 @@ export default function App() {
       if (interval) clearInterval(interval);
     };
   }, [walletAddress]);
+
+  // Handle global uncaught extension/dapp-browser warnings gracefully (e.g. MetaMask disconnected port)
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      if (
+        event.message?.includes("disconnected port") ||
+        event.message?.includes("Attempting to use a disconnected port")
+      ) {
+        event.preventDefault();
+      }
+    };
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason?.message || '';
+      if (
+        reason.includes("disconnected port") ||
+        reason.includes("Attempting to use a disconnected port")
+      ) {
+        event.preventDefault();
+      }
+    };
+    window.addEventListener("error", handleError);
+    window.addEventListener("unhandledrejection", handleRejection);
+    return () => {
+      window.removeEventListener("error", handleError);
+      window.removeEventListener("unhandledrejection", handleRejection);
+    };
+  }, []);
 
   const generateTelegramCode = async () => {
     if (!walletAddress) return;
@@ -440,7 +467,7 @@ export default function App() {
   const [chatLog, setChatLog] = useState<ChatMessage[]>([
     {
       sender: 'bot',
-      text: `🤖 *Welcome to the TrustGraph interactive simulator!* \n\nType commands in the input field below to interact with the underlying ledger in real-time, matching standard **Telegram Bot API commands**:\n\n• \`/start\` — Learn about the TrustGraph architecture\n• \`/activate <code>\` — Kopple your connected Web3 wallet (use code on left side)\n• \`/attest <entity> <score 1-5> <comment>\` — Stake a trust claim (Signed if linked to Web3)\n• \`/tx stake <entity> <amount>\` — Stake CTZN consensus tokens (Linked Web3 account required)\n• \`/trust <entity>\` — Request consensus & call **Gemini AI Analysis**\n• \`/graph <entity>\` — Trace connection triples\n• \`/entities\` — Rank registered ledger atoms\n• \`/wallet\` — Inspect Web3 Wallet connection status`,
+      text: `🤖 *Welcome to the TrustGraph interactive simulator!* \n\nType commands in the input field below to interact with the underlying ledger in real-time, matching standard **Telegram Bot API commands**:\n\n• \`/start\` — Learn about the TrustGraph architecture\n• \`/activate <code>\` — Kopple your connected Web3 wallet (use code on left side)\n• \`/attest <entity> <score 1-5> <comment>\` — Stake a trust claim (Signed if linked to Web3)\n• \`/tx stake <entity> <amount>\` — Stake CTZN consensus tokens (Linked Web3 account required)\n• \`/trust <entity>\` — Request consensus & call **Gemini AI Analysis**\n• \`/graph <entity>\` — Trace connection triples\n• \`/entities\` — Rank registered ledger atoms\n• \`/wallet\` — Inspect Web3 Wallet connection status\n• \`/testnet\` — Open the interactive Base Sepolia & $trust testing guide!`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
   ]);

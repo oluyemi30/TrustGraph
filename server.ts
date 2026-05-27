@@ -105,6 +105,7 @@ Inspired by decentralized trust protocols like <i>Intuition</i>, this system map
 5. <code>/entities</code> — Rank global registered identity nodes by their consensus ratings.
 6. <code>/wallet</code> — Inspect MetaMask or Coinbase connection state.
 7. <code>/activate &lt;code&gt;</code> — Securely link your Telegram account with your connected Web3 wallet.
+8. <code>/testnet</code> — Interactive guide to testing with Base Sepolia testnet ETH & $trust tokens!
 
 💡 <b>Examples:</b>
 • <code>/activate ACTV4K</code> (links your wallet)
@@ -155,7 +156,8 @@ The rating must be a valid integer between <b>1 and 5</b> (where 5 represents ab
       if (linkedWallet) {
         const txHash = `0x${Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join('')}`;
         response += `\n• <b>On-Chain Signer:</b> <code>${linkedWallet.slice(0, 6)}...${linkedWallet.slice(-4)}</code>
-• <b>Base L2 Tx Hash:</b> <a href="https://basescan.org/tx/${txHash}"><code>${txHash.slice(0, 8)}...${txHash.slice(-6)}</code></a> (Confirmed!)
+• <b>Base Sepolia L2 Tx Hash:</b> <a href="https://sepolia.basescan.org/tx/${txHash}"><code>${txHash.slice(0, 8)}...${txHash.slice(-6)}</code></a> (Confirmed!)
+• <b>Intuition Explorer Index:</b> <a href="https://testnet.explorer.intuition.systems/">testnet.explorer.intuition.systems</a>
 • <b>Cryptographic Proof:</b> <code>${signature?.slice(0, 10)}...${signature?.slice(-8)}</code>`;
       }
 
@@ -405,13 +407,43 @@ Example: <code>/tx stake Ethereum 120</code>`;
 
 • <b>Wallet Provider:</b> <code>Base Web3 Bridge</code>
 • <b>Linked Owner:</b> <code>@${escapeHTML(username)}</code> (<code>${linkedWallet.slice(0, 6)}...${linkedWallet.slice(-4)}</code>)
-• <b>L2 Contract:</b> <code>CitizenStakeManager.sol</code>
+• <b>L2 Contract:</b> <code>CitizenStakeManager.sol (Base Sepolia)</code>
 • <b>Target Atom:</b> <code>${escapeHTML(targetAtom.displayName)}</code>
-• <b>Liquid Allocation:</b> <code>${amount} CTZN</code> staked!
-• <b>Base L2 Block Height:</b> <code>#19,204,512</code>
-• <b>Transaction Hash:</b> <a href="https://basescan.org/tx/${txHash}"><code>${txHash.slice(0, 10)}...${txHash.slice(-8)}</code></a>
+• <b>Liquid Allocation:</b> <code>${amount} CTZN / $TRUST</code> staked!
+• <b>Base Sepolia Block Height:</b> <code>#14,529,811</code>
+• <b>Transaction Hash:</b> <a href="https://sepolia.basescan.org/tx/${txHash}"><code>${txHash.slice(0, 10)}...${txHash.slice(-8)}</code></a>
 
-📈 <i>Weight consensus updated! Locked CTZN consensus assets boost the reputational influence index of this identity node on the global ledger!</i>`;
+📈 <i>Weight consensus updated! Locked CTZN/$TRUST consensus assets boost the reputational influence index of this identity node on the global ledger! Check explorer records at <a href="https://testnet.explorer.intuition.systems/">testnet.explorer.intuition.systems</a></i>`;
+    }
+
+    case '/testnet': {
+      const linkedWallet = db.getLinkedWallet(username);
+      return `🧪 <b>Base Sepolia Testnet Testing Console</b>
+
+This bot has been upgraded to support both **Gasless Off-chain Verification** and **Live Base Sepolia Testnet Transactions**. 
+
+Since you have <b>$trust / testnet tokens</b>, follow these steps to test end-to-end:
+
+<b>1. Connect & Switch to On-Chain Mode:</b>
+• Open this app's Web Portal interface.
+• Connect your browser wallet (e.g. MetaMask) using the <b>Connect Wallet</b> button.
+• In the <b>Attest reputation card</b>, notice the <b>Attestation Network Route</b> switch. Toggle it to <b>⚡ On-Chain Transaction</b>.
+
+<b>2. Execute On-Chain Claim on Base Sepolia:</b>
+• Fill in the Attestation form with your feedback comment and trust level (1-5).
+• Click <b>Stake & Attest</b>. MetaMask will pop up and request a real Base Sepolia testnet transaction containing custom hex encoded calldata payloads format:
+  <code>intuition:attest:&lt;user&gt;:&lt;subject&gt;:&lt;score&gt;:&lt;comment&gt;</code>
+• Confirm the transaction. Upon block confirmation, a live Basescan receipt link is generated.
+
+<b>3. Link Your Wallet with the Telegram Bot:</b>
+• On the web page, click <b>"Generate Activation Code"</b> inside the Telegram bridge card.
+• Message this Bot: <code>/activate &lt;your_code&gt;</code> to couple your wallet.
+• Once activated, type <code>/wallet</code> to inspect your testnet balance index and link status!
+
+<b>4. Explore Atomic Consensus Claims:</b>
+• Open the official <a href="https://testnet.explorer.intuition.systems/">Intuition Testnet Explorer ↗</a> to view, search, and verify all Atoms and Triple Claims registered globally.
+
+⚡ <i>Need testnet ETH gas? Use <a href="https://faucets.chain.link/base-sepolia">Chainlink Faucet</a> or <a href="https://sepoliafaucet.com/base">Alchemy Faucet</a> to get free coins instantly!</i>`;
     }
 
     default: {
