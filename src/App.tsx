@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BrowserProvider } from 'ethers';
+import { BrowserProvider, parseEther } from 'ethers';
 import { 
   Bot, 
   Award, 
@@ -182,6 +182,9 @@ export default function App() {
   const [isWalletConnecting, setIsWalletConnecting] = useState(false);
   const [walletType, setWalletType] = useState<string | null>(null);
   const [signingState, setSigningState] = useState<string | null>(null);
+  const [attestationMode, setAttestationMode] = useState<'offchain' | 'onchain'>('offchain');
+  const [onchainValue, setOnchainValue] = useState<string>('0.0001');
+  const [lastOnchainTxHash, setLastOnchainTxHash] = useState<string | null>(null);
 
   // Telegram Integration States
   const [telegramCode, setTelegramCode] = useState<string | null>(null);
@@ -715,41 +718,118 @@ export default function App() {
     let signingWallet: string | undefined = undefined;
 
     if (walletAddress) {
-      setSigningState('Please sign the attestation assertion in your wallet popup...');
-      try {
-        let eth = (window as any).ethereum;
-        
-        // Resolve MetaMask if multiple wallets are installed
-        if (eth && eth.providers && Array.isArray(eth.providers)) {
-          const metamaskProvider = eth.providers.find((p: any) => p.isMetaMask);
-          if (metamaskProvider) {
-            eth = metamaskProvider;
+      let eth = (window as any).ethereum;
+      
+      // Resolve MetaMask if multiple wallets are installed
+      if (eth && eth.providers && Array.isArray(eth.providers)) {
+        const metamaskProvider = eth.providers.find((p: any) => p.isMetaMask);
+        if (metamaskProvider) {
+          eth = metamaskProvider;
+        }
+      }
+
+      if (!eth) {
+        alert("No Ethereum browser wallet detected. Please install/unlock MetaMask.");
+        return;
+      }
+
+      if (attestationMode === 'onchain') {
+        setSigningState('Initiating on-chain switch to Base Sepolia Testnet...');
+        const chainIdHex = '0x14a34'; // Base Sepolia ChainID (84532)
+        try {
+          await eth.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: chainIdHex }],
+          });
+        } catch (switchError: any) {
+          // This error code indicates that the chain has not been added to MetaMask.
+          if (switchError.code === 4902) {
+            try {
+              await eth.request({
+                method: 'wallet_addEthereumChain',
+                params: [
+                  {
+                    chainId: chainIdHex,
+                    chainName: 'Base Sepolia Testnet',
+                    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+                    rpcUrls: ['https://sepolia.base.org'],
+                    blockExplorerUrls: ['https://sepolia.basescan.org'],
+                  },
+                ],
+              });
+            } catch (addError: any) {
+              console.error("Failed to add Base Sepolia network", addError);
+              setSigningState(`Failed to configure network: ${addError.message || addError}`);
+              setTimeout(() => setSigningState(null), 5000);
+              return;
+            }
+          } else {
+            console.error("Failed to switch to Base Sepolia network", switchError);
+            setSigningState(`Failed to switch to Base Sepolia Testnet: ${switchError.message || switchError}`);
+            setTimeout(() => setSigningState(null), 5000);
+            return;
           }
         }
 
-        if (!eth) {
-          throw new Error('Ethereum provider was disconnected');
-        }
-        const provider = new BrowserProvider(eth);
-        const signer = await provider.getSigner();
-        
-        // Define a clean human-readable assertion string matching official web3 formats
-        const assertionMessage = `DeFi Reputation Attestation Proof\n\n` +
-                                 `Validator: ${walletAddress}\n` +
-                                 `Citizen Handle: @${createAttForm.fromUser}\n` +
-                                 `Target Subject: ${createAttForm.toEntity.toUpperCase()}\n` +
-                                 `Reputation Weight: ${createAttForm.trustScore}/5\n` +
-                                 `Proof Remark: "${createAttForm.comment}"\n` +
-                                 `System Time: ${new Date().toISOString()}`;
+        try {
+          setSigningState('Preparing transaction payload...');
+          const provider = new BrowserProvider(eth);
+          const signer = await provider.getSigner();
 
-        signature = await signer.signMessage(assertionMessage);
-        signingWallet = walletAddress;
-        setSigningState('Cryptographic signature obtained successfully!');
-      } catch (err: any) {
-        console.error("Signing failed", err);
-        setSigningState(`Signing canceled or failed: ${err.message || 'unknown error'}`);
-        setTimeout(() => setSigningState(null), 5000);
-        return; // Don't proceed if they reject or it fails
+          // Standardize Intuition claim as custom hex encoded calldata
+          const utf8Encode = new TextEncoder();
+          const payloadStr = `intuition:attest:${createAttForm.fromUser}:${createAttForm.toEntity}:${createAttForm.trustScore}:${createAttForm.comment}`;
+          const dataHex = '0x' + Array.from(utf8Encode.encode(payloadStr)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+          setSigningState('Confirm the staking/attestation Base Sepolia transaction in MetaMask...');
+          
+          const targetAddress = walletAddress; // self-tx ensures user keeps their testnet ETH safe!
+          const parsedVal = parseEther(onchainValue || '0.0001');
+
+          const txResponse = await signer.sendTransaction({
+            to: targetAddress,
+            value: parsedVal,
+            data: dataHex
+          });
+
+          setSigningState('Transaction submitted! Waiting for block confirmation on Base Sepolia...');
+          const receipt = await txResponse.wait(1);
+          
+          signature = txResponse.hash;
+          signingWallet = walletAddress;
+          setLastOnchainTxHash(txResponse.hash);
+          setSigningState(`Transaction Confirmed! Proof Hash: ${txResponse.hash.slice(0, 10)}...`);
+        } catch (err: any) {
+          console.error("On-chain transaction failed", err);
+          setSigningState(`On-chain transaction failed: ${err.message || 'unknown error'}`);
+          setTimeout(() => setSigningState(null), 5000);
+          return;
+        }
+
+      } else {
+        // Classic Off-chain gasless signature mode
+        setSigningState('Please sign the attestation assertion in your wallet popup...');
+        try {
+          const provider = new BrowserProvider(eth);
+          const signer = await provider.getSigner();
+          
+          const assertionMessage = `DeFi Reputation Attestation Proof\n\n` +
+                                   `Validator: ${walletAddress}\n` +
+                                   `Citizen Handle: @${createAttForm.fromUser}\n` +
+                                   `Target Subject: ${createAttForm.toEntity.toUpperCase()}\n` +
+                                   `Reputation Weight: ${createAttForm.trustScore}/5\n` +
+                                   `Proof Remark: "${createAttForm.comment}"\n` +
+                                   `System Time: ${new Date().toISOString()}`;
+
+          signature = await signer.signMessage(assertionMessage);
+          signingWallet = walletAddress;
+          setSigningState('Cryptographic signature obtained successfully!');
+        } catch (err: any) {
+          console.error("Signing failed", err);
+          setSigningState(`Signing canceled or failed: ${err.message || 'unknown error'}`);
+          setTimeout(() => setSigningState(null), 5000);
+          return;
+        }
       }
     }
 
@@ -761,7 +841,9 @@ export default function App() {
           from_user: createAttForm.fromUser,
           to_entity: createAttForm.toEntity,
           trust_score: createAttForm.trustScore,
-          comment: createAttForm.comment,
+          comment: attestationMode === 'onchain' 
+            ? `${createAttForm.comment} [ON-CHAIN BASE SEPOLIA]` 
+            : createAttForm.comment,
           signature,
           wallet_address: signingWallet
         })
@@ -773,7 +855,6 @@ export default function App() {
           comment: ''
         });
         setSelectedAtomName(createAttForm.toEntity);
-        // Refresh
         await loadData();
       }
     } catch (err) {
@@ -1183,11 +1264,80 @@ export default function App() {
 
             <form onSubmit={handleCreateAttestation} className="space-y-4 font-sans">
               {walletAddress && (
-                <div className="bg-[#C5A880]/10 border border-[#C5A880]/30 p-3 text-[11px] font-sans text-[#C5A880] flex items-center gap-2 rounded-none">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
-                  <span>
-                    <strong>Web3 Sign Mode:</strong> Your attestation will be cryptographically signed via your <strong>{walletType}</strong> wallet before commitment.
-                  </span>
+                <div className="space-y-3 p-3.5 bg-[#F5F2ED]/5 border border-[#F5F2ED]/10 rounded-none">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-sans uppercase tracking-widest text-[#F5F2ED]/50 font-bold">Attestation Network Route</span>
+                    <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 uppercase tracking-wide">Connected</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAttestationMode('offchain')}
+                      className={`py-2 text-[10px] font-sans uppercase tracking-wider text-center border cursor-pointer transition-all ${
+                        attestationMode === 'offchain'
+                          ? 'border-[#F5F2ED] bg-[#F5F2ED] text-[#0A0A0A] font-bold'
+                          : 'border-[#F5F2ED]/15 hover:border-[#F5F2ED]/40 text-[#F5F2ED]/70'
+                      }`}
+                    >
+                      🛡️ Gasless Signature
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAttestationMode('onchain')}
+                      className={`py-2 text-[10px] font-sans uppercase tracking-wider text-center border cursor-pointer transition-all ${
+                        attestationMode === 'onchain'
+                          ? 'border-emerald-500 bg-emerald-500/15 text-emerald-400 font-bold'
+                          : 'border-[#F5F2ED]/15 hover:border-[#F5F2ED]/40 text-[#F5F2ED]/70'
+                      }`}
+                    >
+                      ⚡ On-Chain Transaction
+                    </button>
+                  </div>
+
+                  {attestationMode === 'onchain' ? (
+                    <div className="space-y-2 pt-1.5 border-t border-[#F5F2ED]/10 text-[11px] text-emerald-400 font-sans">
+                      <p className="leading-relaxed">
+                        <strong>Base Sepolia Testnet active:</strong> The attestation payload is compiled as custom hex data, and MetaMask will trigger a live blockchain transaction.
+                      </p>
+                      
+                      <div>
+                        <label className="block text-[9px] uppercase tracking-wider text-[#F5F2ED]/50 mb-1">
+                          Testnet ETH Confidence Stake (Value is kept safe in your wallet self-send)
+                        </label>
+                        <div className="relative">
+                          <input 
+                            type="number" 
+                            step="0.0001"
+                            min="0"
+                            placeholder="0.0001"
+                            value={onchainValue}
+                            onChange={(e) => setOnchainValue(e.target.value)}
+                            className="w-full bg-[#0A0A0A] border border-emerald-500/30 text-emerald-300 font-mono text-[11px] rounded-none pl-3 pr-12 py-1.5 focus:outline-none focus:border-emerald-400"
+                          />
+                          <span className="absolute right-3 top-1.5 text-[#F5F2ED]/40 font-mono text-[10px]">ETH</span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-[#F5F2ED]/60 leading-normal font-sans pt-1">
+                      <strong>Gasless Mode:</strong> Generates a client-side cryptographic signature proof. Zero gas, stored instantly on the local consensus server database.
+                    </p>
+                  )}
+
+                  {lastOnchainTxHash && (
+                    <div className="mt-2.5 p-2 bg-emerald-500/10 border border-emerald-500/30 text-[10px] font-sans text-emerald-400 flex items-center justify-between">
+                      <span>Confirmed On-Chain!</span>
+                      <a 
+                        href={`https://sepolia.basescan.org/tx/${lastOnchainTxHash}`} 
+                        target="_blank" 
+                        referrerPolicy="no-referrer"
+                        className="font-mono underline hover:text-emerald-300 font-bold"
+                      >
+                        Basescan ↗
+                      </a>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1851,14 +2001,27 @@ export default function App() {
                                   @{att.from_user}
                                 </span>
                                 {att.signature && (
-                                  <span 
-                                    className="text-[9px] text-[#C5A880] tracking-tight bg-[#C5A880]/10 border border-[#C5A880]/20 px-1.5 py-0.5 mt-1 inline-flex items-center gap-1 cursor-pointer hover:bg-[#C5A880]/25 rounded-none max-w-fit"
-                                    onClick={() => alert(`DEFI REPUTATION ATTESTATION PROOF\n\nSigner Wallet: ${att.wallet_address}\n\nCryptographic Signature Hash:\n${att.signature}`)}
-                                    title="Cryptographically Verified Web3 On-Chain Signature. Click to audit proof."
-                                  >
-                                    <ShieldCheck className="h-2.5 w-2.5 text-[#C5A880]" />
-                                    <span>Verified</span>
-                                  </span>
+                                  att.signature.length === 66 && att.signature.startsWith('0x') ? (
+                                    <a 
+                                      href={`https://sepolia.basescan.org/tx/${att.signature}`}
+                                      target="_blank"
+                                      referrerPolicy="no-referrer"
+                                      className="text-[9px] text-emerald-400 tracking-tight bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 mt-1 inline-flex items-center gap-1 cursor-pointer hover:bg-emerald-500/25 rounded-none max-w-fit font-bold no-underline"
+                                      title="On-Chain Base Sepolia Transaction confirmed. Click to explore on Basescan!"
+                                    >
+                                      <ShieldCheck className="h-2.5 w-2.5 text-emerald-400 animate-pulse" />
+                                      <span>⚡ Basescan</span>
+                                    </a>
+                                  ) : (
+                                    <span 
+                                      className="text-[9px] text-[#C5A880] tracking-tight bg-[#C5A880]/10 border border-[#C5A880]/20 px-1.5 py-0.5 mt-1 inline-flex items-center gap-1 cursor-pointer hover:bg-[#C5A880]/25 rounded-none max-w-fit"
+                                      onClick={() => alert(`DEFI REPUTATION ATTESTATION PROOF\n\nSigner Wallet: ${att.wallet_address}\n\nCryptographic Signature Hash:\n${att.signature}`)}
+                                      title="Cryptographically Verified Web3 Off-Chain Signature. Click to audit proof."
+                                    >
+                                      <ShieldCheck className="h-2.5 w-2.5 text-[#C5A880]" />
+                                      <span>Verified</span>
+                                    </span>
+                                  )
                                 )}
                               </div>
                             </td>
