@@ -270,9 +270,9 @@ export default function App() {
       } else {
         alert(data.error || "Failed to generate activation code.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error generating code", err);
-      alert("Error generating code. Please verify server connection.");
+      alert(`Error generating activation code: ${err.message || err}\n\nTroubleshooting Tip:\nMake sure you are running the full-stack server via "npm start" or hosted in an environment that executes the Express backend (Node.js), and is not being served solely as a static HTML page without the backend.`);
     } finally {
       setIsGeneratingCode(false);
     }
