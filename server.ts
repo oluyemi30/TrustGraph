@@ -6,6 +6,12 @@ import { createServer as createViteServer } from 'vite';
 import { db } from './server/db';
 import { explainTrust } from './server/ai';
 import { syncWithIntuitionMainnet } from './server/sync';
+import {
+  getGlobalScore,
+  getSyncHealth,
+  batchScore,
+  isEvmAddress,
+} from './server/intuition-mcp';
 
 // Load environment variables
 dotenv.config();
@@ -190,6 +196,30 @@ Syntax: <code>/trust &lt;entity_name&gt;</code>
 Example: <code>/trust Ethereum</code>`;
       }
 
+      // On-chain branch: if the entity is an EVM address, route to the Intuition
+      // MCP for an objective global trust score instead of the local ledger.
+      // NOTE: this MCP call can take 20+ seconds. Before production this must be
+      // moved to a background job so it doesn't block the bot reply.
+      if (isEvmAddress(entity)) {
+        try {
+          const score = await getGlobalScore(entity);
+          const composite100 = (score.compositeScore * 20).toFixed(1);
+          const confidencePct = (score.confidence * 100).toFixed(1);
+          return `🔗 <b>On-Chain Trust Score (Intuition)</b>
+
+• <b>Address:</b> <code>${escapeHTML(score.address)}</code>
+• <b>Composite Trust:</b> <b>${composite100}/100</b> <code>(raw ${score.compositeScore.toFixed(2)}/5)</code>
+• <b>Confidence:</b> <code>${confidencePct}%</code>
+
+📡 <i>Computed live from the Intuition Trust Engine across the global attestation graph.</i>`;
+        } catch (err: any) {
+          return `❌ <b>On-Chain Trust Lookup Failed:</b>
+<code>${escapeHTML(err.message)}</code>
+
+The Intuition Trust Engine could not score this address. Try again shortly.`;
+        }
+      }
+
       const atom = db.findAtom(entity);
       if (!atom) {
         return `🔍 <b>Entity not found.</b>
@@ -298,22 +328,80 @@ Total Registered Atoms: <code>${db.getAtoms().length}</code>
 
     case '/sync': {
       try {
-        const stats = await syncWithIntuitionMainnet();
-        return `🔄 <b>Intuition Mainnet Sync Executed Successfully!</b>
-        
-The TrustGraph database has been successfully synchronized using live records from the Base Mainnet decentralized indexing node.
+        const health = await getSyncHealth();
 
-📊 <b>Synchronization Performance Stats:</b>
-• <b>Atoms Synced:</b> <code>${stats.atomsSynced}</code>
-• <b>Claims Synced (Triples):</b> <code>${stats.claimsSynced}</code>
-• <b>Mainnet Node Gateway:</b> <code>${stats.endpointUsed}</code>
-• <b>Sync Strategy:</b> ${stats.isFallback ? '<i>Activated Mainnet Caching Buffer</i>' : '<i>Established Real-time Base Mainnet Gateway Connection</i>'}
-• <b>Execution Timestamp:</b> <code>${stats.timestamp}</code>
+        // Top 5 predicates by frequency from the live engine distribution.
+        const topPredicates = Object.entries(health.predicateDistributionTop10 || {})
+          .sort(([, a], [, b]) => b - a)
+          .slice(0, 5);
+
+        const predicateLines = topPredicates.length > 0
+          ? topPredicates
+              .map(([pred, count], i) => `${i + 1}. <code>${escapeHTML(pred)}</code> — <b>${count}</b>`)
+              .join('\n')
+          : '<i>No predicate data reported.</i>';
+
+        const lastSynced = health.lastSyncedAt
+          ? new Date(health.lastSyncedAt).toLocaleString()
+          : 'Never';
+
+        return `🔄 <b>Intuition Trust Engine — Live Sync Health</b>
+
+📊 <b>Graph State:</b>
+• <b>Health:</b> <code>${escapeHTML(health.health)}</code>
+• <b>Nodes:</b> <code>${health.nodeCount}</code>
+• <b>Edges:</b> <code>${health.edgeCount}</code>
+• <b>Last Synced:</b> <code>${escapeHTML(lastSynced)}</code>
+
+🔝 <b>Top 5 Predicates:</b>
+${predicateLines}
 
 📌 <i>Type /entities to inspect the real-time reputation leaderboards!</i>`;
       } catch (err: any) {
-        return `❌ <b>Sync Failed:</b>
+        return `❌ <b>Sync Health Check Failed:</b>
 <code>${escapeHTML(err.message)}</code>`;
+      }
+    }
+
+    case '/score': {
+      // Filter every argument after the command down to valid EVM addresses.
+      const addrs = args.slice(1).filter(isEvmAddress);
+
+      if (addrs.length === 0) {
+        return `❌ <b>Error: No valid EVM addresses provided.</b>
+Syntax: <code>/score &lt;address&gt; [address2] [address3] ...</code>
+
+Example: <code>/score 0xd408e6de5f34ff07736d11af640fc5b3e689681d</code>`;
+      }
+
+      // Global scoring uses an empty anchor set (no personalized perspective).
+      // NOTE: this MCP call can take 20+ seconds. Before production this must be
+      // moved to a background job so it doesn't block the bot reply.
+      try {
+        const result = await batchScore([], addrs);
+
+        const ranked = [...result.scores]
+          .sort((a, b) => b.compositeScore - a.compositeScore);
+
+        const lines = ranked
+          .map((s, i) => {
+            const composite100 = (s.compositeScore * 20).toFixed(1);
+            const confidencePct = (s.confidence * 100).toFixed(1);
+            return `${i + 1}. <code>${escapeHTML(s.target.slice(0, 6))}...${escapeHTML(s.target.slice(-4))}</code> — <b>${composite100}/100</b> <code>(conf ${confidencePct}%)</code>`;
+          })
+          .join('\n');
+
+        return `🏅 <b>Global Trust Ranking (Intuition)</b>
+Scored <code>${result.scores.length}</code> address${result.scores.length === 1 ? '' : 'es'} in <code>${result.computationTimeMs}ms</code>.
+
+${lines}
+
+📡 <i>Objective global scores from the Intuition Trust Engine, ranked highest first.</i>`;
+      } catch (err: any) {
+        return `❌ <b>On-Chain Scoring Failed:</b>
+<code>${escapeHTML(err.message)}</code>
+
+The Intuition Trust Engine could not score these addresses. Try again shortly.`;
       }
     }
 
