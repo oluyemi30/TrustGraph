@@ -1149,9 +1149,19 @@ export default function App() {
           <div className="bg-[#F5F2ED]/5 border border-[#F5F2ED]/10 p-6 rounded-none relative overflow-hidden">
             <div className="absolute top-0 right-0 h-24 w-24 bg-sky-400/2 rounded-full blur-[35px] pointer-events-none"></div>
             
-            <h2 className="text-xs uppercase tracking-[0.2em] font-sans text-sky-400 border-b border-[#F5F2ED]/10 pb-2 mb-4 flex items-center gap-2">
-              <Bot className="h-4 w-4 text-sky-400" />
-              Telegram Web3 Bridge
+            <h2 className="text-xs uppercase tracking-[0.2em] font-sans text-sky-400 border-b border-[#F5F2ED]/10 pb-2 mb-4 flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2">
+                <Bot className="h-4 w-4 text-sky-400" />
+                Telegram Web3 Bridge
+              </span>
+              <a 
+                href="https://t.me/trustmvpbot" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-[9px] uppercase font-bold tracking-widest text-[#0A0A0A] bg-sky-400 hover:bg-sky-300 px-2 py-0.5 transition-colors flex items-center gap-1 rounded-none font-sans"
+              >
+                Launch Bot ↗
+              </a>
             </h2>
 
             {!walletAddress ? (
@@ -1210,7 +1220,7 @@ export default function App() {
                         <div className="text-[11px] text-[#F5F2ED]/80 space-y-2 pt-1 border-t border-[#F5F2ED]/10">
                           <p className="font-semibold text-sky-400">How to activate:</p>
                           <ol className="list-decimal pl-4 space-y-1 text-[#F5F2ED]/60 text-[10px]">
-                            <li>Message the Telegram bot.</li>
+                            <li>Message the <a href="https://t.me/trustmvpbot" target="_blank" rel="noopener noreferrer" className="text-sky-400 hover:underline font-bold">@trustmvpbot</a> on Telegram.</li>
                             <li>Type: <code className="text-[#F5F2ED] bg-[#0A0A0A] px-1 py-0.5 font-mono">/activate {telegramCode}</code></li>
                             <li>Your wallet will link automatically right here.</li>
                           </ol>
@@ -2177,9 +2187,17 @@ export default function App() {
                     <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-400 rounded-full"></span>
                   </div>
                   <div>
-                    <h2 className="text-xs uppercase tracking-[0.2em] font-sans text-[#F5F2ED] flex items-center gap-2">
+                    <h2 className="text-xs uppercase tracking-[0.2em] font-sans text-[#F5F2ED] flex items-center gap-2 flex-wrap">
                       TrustGraph Telegram Bot
                       <span className="text-[9px] border border-[#F5F2ED]/20 text-[#F5F2ED]/40 px-2 py-0.5 rounded-none font-sans font-bold uppercase tracking-widest">EMULATOR</span>
+                      <a 
+                        href="https://t.me/trustmvpbot" 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-[9px] text-sky-400 hover:text-sky-300 font-sans font-bold uppercase tracking-widest flex items-center gap-1 underline"
+                      >
+                        Launch Real Bot t.me/trustmvpbot ↗
+                      </a>
                     </h2>
                     <p className="text-xs text-[#F5F2ED]/50 font-sans tracking-wide">Synthesized local container thread representing real bot hooks.</p>
                   </div>

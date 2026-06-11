@@ -70,13 +70,7 @@ export interface GraphIntelligence {
   indirectPaths: IndirectPath[];
 }
 
-import os from 'os';
-
-// Use a writeable directory in serverless environments (Vercel functions have
-// a read-only project root). Prefer explicit DATA_DIR env var, otherwise
-// use OS temp dir when running on Vercel.
-const DEFAULT_DATA_DIR = process.env.DATA_DIR || (process.env.VERCEL ? path.join(os.tmpdir(), 'trustgraph-data') : path.join(process.cwd(), 'data'));
-const DATA_DIR = DEFAULT_DATA_DIR;
+const DATA_DIR = path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'database.json');
 
 class DatabaseEngine {
@@ -92,12 +86,8 @@ class DatabaseEngine {
   }
 
   private init() {
-    try {
-      if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
-      }
-    } catch (err: any) {
-      console.warn('[Database] Could not create DATA_DIR, falling back to in-memory DB. Error:', err.message);
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
     }
 
     if (fs.existsSync(DB_FILE)) {
@@ -206,19 +196,13 @@ class DatabaseEngine {
 
   private save() {
     try {
-      // Attempt to persist DB file; if filesystem is read-only (serverless),
-      // log a warning and continue with in-memory state.
-      try {
-        fs.writeFileSync(DB_FILE, JSON.stringify({
-          atoms: this.atoms,
-          attestations: this.attestations,
-          triples: this.triples,
-          walletLinks: this.walletLinks,
-          activationCodes: this.activationCodes
-        }, null, 2), 'utf8');
-      } catch (err: any) {
-        console.warn('[Database] Could not write DB file (read-only filesystem?), continuing in-memory. Error:', err.message);
-      }
+      fs.writeFileSync(DB_FILE, JSON.stringify({
+        atoms: this.atoms,
+        attestations: this.attestations,
+        triples: this.triples,
+        walletLinks: this.walletLinks,
+        activationCodes: this.activationCodes
+      }, null, 2), 'utf8');
     } catch (err) {
       console.error('[Database] Error saving DB file:', err);
     }
