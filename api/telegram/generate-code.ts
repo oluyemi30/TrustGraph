@@ -1,7 +1,6 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
-import { db } from '../../../server/db';
+import { generateActivationCode } from '../../server/telegram-store';
 
-export default function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: any, res: any) {
   try {
     if (req.method !== 'POST') {
       res.status(405).json({ success: false, error: 'Method Not Allowed' });
@@ -14,7 +13,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    const code = db.generateActivationCode(String(walletAddress));
+    const code = await generateActivationCode(String(walletAddress));
     res.json({ success: true, code });
   } catch (err: any) {
     console.error('[api/telegram/generate-code] Error:', err);

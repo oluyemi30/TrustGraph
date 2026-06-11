@@ -2,6 +2,11 @@ import express from 'express';
 import path from 'path';
 import dotenv from 'dotenv';
 import { db } from './db';
+import {
+  generateActivationCode,
+  getTelegramUserForWallet,
+  unlinkWallet,
+} from './telegram-store';
 import { explainTrust } from './ai';
 import { syncWithIntuitionMainnet } from './sync';
 import {
@@ -185,32 +190,32 @@ app.post('/api/sync-intuition', async (req, res) => {
   }
 });
 
-app.post('/api/telegram/generate-code', (req, res) => {
+app.post('/api/telegram/generate-code', async (req, res) => {
   try {
     const { walletAddress } = req.body;
     if (!walletAddress) return res.status(400).json({ success: false, error: 'walletAddress is required' });
-    const code = db.generateActivationCode(walletAddress);
+    const code = await generateActivationCode(walletAddress);
     res.json({ success: true, code });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-app.get('/api/telegram/status/:walletAddress', (req, res) => {
+app.get('/api/telegram/status/:walletAddress', async (req, res) => {
   try {
     const { walletAddress } = req.params;
-    const telegramUser = db.getTelegramUserForWallet(walletAddress);
+    const telegramUser = await getTelegramUserForWallet(walletAddress);
     res.json({ success: true, linked: !!telegramUser, telegramUser });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-app.post('/api/telegram/unlink', (req, res) => {
+app.post('/api/telegram/unlink', async (req, res) => {
   try {
     const { walletAddress } = req.body;
     if (!walletAddress) return res.status(400).json({ success: false, error: 'walletAddress is required' });
-    const unlinked = db.unlinkWallet(walletAddress);
+    const unlinked = await unlinkWallet(walletAddress);
     res.json({ success: true, unlinked });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

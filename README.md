@@ -105,6 +105,24 @@ This project is currently in active development and evolving into a full trust i
 
 ⸻
 
+## 🌐 Supabase Activation Storage
+
+For Vercel-compatible hosted activation storage, configure Supabase and set these environment variables:
+
+  SUPABASE_URL
+  SUPABASE_SERVICE_ROLE_KEY
+
+The backend now routes Telegram activation codes and wallet link lookups through Supabase when those variables are present.
+
+Recommended tables:
+
+  activation_codes (wallet_address text unique, code text, created_at timestamptz)
+  wallet_links (wallet_address text unique, telegram_user text, telegram_id text, activated_at timestamptz)
+
+Use `npm run migrate:supabase` to migrate any local wallet link or activation code data after setting the Supabase env vars.
+
+⸻
+
 ## 💡 Inspiration
 
 This project is inspired by the idea of decentralized knowledge and trust systems, where information is structured as a graph rather than isolated opinions.

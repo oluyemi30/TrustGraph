@@ -4,6 +4,13 @@ import fs from 'fs';
 import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import { db } from './server/db';
+import {
+  generateActivationCode,
+  activateTelegram,
+  getLinkedWallet,
+  getTelegramUserForWallet,
+  unlinkWallet,
+} from './server/telegram-store';
 import { explainTrust } from './server/ai';
 import { syncWithIntuitionMainnet } from './server/sync';
 import {
@@ -155,7 +162,7 @@ The rating must be a valid integer between <b>1 and 5</b> (where 5 represents ab
         comment = 'Staked trust without custom comment.';
       }
 
-      const linkedWallet = db.getLinkedWallet(username);
+      const linkedWallet = await getLinkedWallet(username);
       let signature: string | undefined = undefined;
       if (linkedWallet) {
         // Generate cryptographic-like signature proof
@@ -407,7 +414,7 @@ The Intuition Trust Engine could not score these addresses. Try again shortly.`;
 
     case '/wallet':
     case '/linkwallet': {
-      const linkedWallet = db.getLinkedWallet(username);
+      const linkedWallet = await getLinkedWallet(username);
       if (linkedWallet) {
         const stats = db.getAttestations().filter(a => a.from_user.toLowerCase() === username.toLowerCase());
         const signedCount = stats.filter(a => !!a.signature).length;
@@ -443,7 +450,7 @@ Syntax: <code>/activate &lt;code&gt;</code>
 Example: <code>/activate A8K9X2</code>`;
       }
 
-      const res = db.activateTelegram(code, username, user.id);
+      const res = await activateTelegram(code, username, user.id);
       if (res.success) {
         return `🎉 <b>Link Established Successfully!</b>
 
@@ -463,7 +470,7 @@ ${escapeHTML(res.error || 'The code provided is invalid or has expired.')}`;
     case '/tx':
     case '/transact':
     case '/stake': {
-      const linkedWallet = db.getLinkedWallet(username);
+      const linkedWallet = await getLinkedWallet(username);
       if (!linkedWallet) {
         return `❌ <b>Transaction Rejected: Wallet Not Linked.</b>
 
@@ -517,7 +524,7 @@ Example: <code>/tx stake Ethereum 120</code>`;
     }
 
     case '/testnet': {
-      const linkedWallet = db.getLinkedWallet(username);
+      const linkedWallet = await getLinkedWallet(username);
       return `🧪 <b>Base Sepolia Testnet Testing Console</b>
 
 This bot has been upgraded to support both **Gasless Off-chain Verification** and **Live Base Sepolia Testnet Transactions**. 
@@ -654,36 +661,36 @@ app.post('/api/sync-intuition', async (req, res) => {
 // Telegram - Web3 Bridge API Endpoints
 // -------------------------------------------------------------------------
 
-app.post('/api/telegram/generate-code', (req, res) => {
+app.post('/api/telegram/generate-code', async (req, res) => {
   try {
     const { walletAddress } = req.body;
     if (!walletAddress) {
       return res.status(400).json({ success: false, error: 'walletAddress is required' });
     }
-    const code = db.generateActivationCode(walletAddress);
+    const code = await generateActivationCode(walletAddress);
     res.json({ success: true, code });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-app.get('/api/telegram/status/:walletAddress', (req, res) => {
+app.get('/api/telegram/status/:walletAddress', async (req, res) => {
   try {
     const { walletAddress } = req.params;
-    const telegramUser = db.getTelegramUserForWallet(walletAddress);
+    const telegramUser = await getTelegramUserForWallet(walletAddress);
     res.json({ success: true, linked: !!telegramUser, telegramUser });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-app.post('/api/telegram/unlink', (req, res) => {
+app.post('/api/telegram/unlink', async (req, res) => {
   try {
     const { walletAddress } = req.body;
     if (!walletAddress) {
       return res.status(400).json({ success: false, error: 'walletAddress is required' });
     }
-    const unlinked = db.unlinkWallet(walletAddress);
+    const unlinked = await unlinkWallet(walletAddress);
     res.json({ success: true, unlinked });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

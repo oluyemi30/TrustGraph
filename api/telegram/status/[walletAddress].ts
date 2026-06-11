@@ -1,7 +1,6 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
-import { db } from '../../../../server/db';
+import { getTelegramUserForWallet } from '../../../server/telegram-store';
 
-export default function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: any, res: any) {
   try {
     if (req.method !== 'GET') {
       res.status(405).json({ success: false, error: 'Method Not Allowed' });
@@ -15,7 +14,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const addr = Array.isArray(walletAddress) ? walletAddress[0] : walletAddress;
-    const telegramUser = db.getTelegramUserForWallet(String(addr));
+    const telegramUser = await getTelegramUserForWallet(String(addr));
     res.json({ success: true, linked: !!telegramUser, telegramUser });
   } catch (err: any) {
     console.error('[api/telegram/status] Error:', err);
