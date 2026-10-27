@@ -1,0 +1,683 @@
+# TrustGraph — Full Repository Upgrade & Robinhood Chain Integration
+
+## Project Overview
+
+You are a senior full-stack Web3 engineer, Solidity smart contract developer, security engineer, and product designer.
+
+Your task is to **upgrade my existing TrustGraph repository into a functional, polished, on-chain trust and reputation protocol built on Robinhood Chain**, starting with its testnet.
+
+**Repository:** https://github.com/oluyemi30/TrustGraph
+
+**Target network:** Robinhood Chain Testnet  
+**Chain ID:** `46630`  
+**RPC:** `https://rpc.testnet.chain.robinhood.com`  
+**Block Explorer:** `https://explorer.testnet.chain.robinhood.com`  
+**Native gas token:** ETH
+
+Do not simply generate a new project, a mockup, or a disconnected demo. Inspect the current repository, understand its architecture, preserve its useful functionality, and implement the upgrade directly within the existing codebase.
+
+The final product should feel like a real Web3 infrastructure product: trustworthy, modern, technically credible, visually refined, and ready for public testnet testing.
+
+---
+
+# 1. FIRST: INSPECT THE ENTIRE EXISTING REPOSITORY
+
+Before modifying anything:
+
+1. Inspect the repository structure, `package.json`, frontend, backend, database, smart-contract setup if present, Telegram bot, environment configuration, and existing API routes.
+2. Understand how the current trust graph, attestations, wallet connection, AI risk explanations, wallet linking, and Intuition integration work.
+3. Identify reusable components, existing data models, working features, broken integrations, security issues, and incomplete functionality.
+4. Make a short implementation plan based on the actual code.
+5. Implement the changes in the existing architecture rather than replacing working functionality unnecessarily.
+
+Preserve the project's identity and useful features, including:
+
+- TrustGraph's trust and reputation graph.
+- Entity profiles and relationships.
+- Community trust attestations and comments.
+- Wallet connection and wallet linking.
+- Graph visualization and reputation summaries.
+- AI-assisted risk analysis and explanations.
+- Telegram bot and its existing commands.
+- Existing API routes and data wherever practical.
+- Intuition integration as an optional supplementary data source.
+- Current working frontend and backend functionality.
+
+Do not delete useful features simply to simplify the implementation.
+
+# 2. ROBINHOOD CHAIN INTEGRATION
+
+Configure Robinhood Chain Testnet as the primary blockchain network.
+
+Use the following network configuration consistently throughout the application:
+
+```ts
+export const ROBINHOOD_TESTNET = {
+  chainId: 46630,
+  chainIdHex: "0xb626",
+  chainName: "Robinhood Chain Testnet",
+  nativeCurrency: {
+    name: "Ether",
+    symbol: "ETH",
+    decimals: 18,
+  },
+  rpcUrls: [
+    "https://rpc.testnet.chain.robinhood.com",
+  ],
+  blockExplorerUrls: [
+    "https://explorer.testnet.chain.robinhood.com",
+  ],
+};
+```
+
+Requirements:
+
+- Make Robinhood Chain the default network for all on-chain TrustGraph operations.
+- Add a working Connect Wallet flow using the existing wallet integration.
+- Support compatible injected EVM wallets.
+- Detect the current chain and show a clear network status.
+- Allow users to switch to Robinhood Chain Testnet or add it to their wallet when necessary.
+- Handle rejected wallet requests, unsupported networks, disconnected wallets, RPC errors, and pending transactions gracefully.
+- Display the connected wallet address in shortened form.
+- Display the correct network name and native token symbol.
+- Never imply that a transaction is on Robinhood Chain when it was sent to another network.
+- Keep RPC URLs configurable through environment variables.
+- Use the public testnet RPC for development only; document how to use a dedicated RPC provider for production.
+- Never hardcode private keys or commit secrets.
+
+# 3. BUILD A REAL TRUSTGRAPH SMART CONTRACT
+
+Create a proper Solidity smart contract for on-chain trust attestations.
+
+Recommended file structure:
+
+```text
+contracts/
+  TrustGraphRegistry.sol
+
+test/
+  TrustGraphRegistry.test.ts
+
+scripts/
+  deploy-testnet.ts
+
+src/
+  lib/
+    robinhoodChain.ts
+    trustGraphContract.ts
+```
+
+Use a current, compatible Solidity compiler and an appropriate Hardhat or existing project toolchain. Do not introduce a second conflicting development framework if one already exists.
+
+## Contract functionality
+
+Implement a registry that supports:
+
+- Creating a trust attestation.
+- Identifying the subject of an attestation.
+- Recording the attester's wallet address.
+- Recording a trust score from 1 to 5.
+- Storing a hash of supporting evidence rather than sensitive personal information.
+- Recording a creation timestamp.
+- Emitting events that an indexer can reliably consume.
+- Allowing an attester to revoke their own attestation.
+- Preventing unauthorized revocation.
+- Exposing public attestation data for verification.
+- Providing a reliable way to determine whether an attestation has been revoked.
+
+Use stable subject identifiers, such as `bytes32` hashes, so entities can be represented consistently without requiring personal information on-chain.
+
+Do not put private messages, phone numbers, personal documents, or sensitive user information directly on-chain.
+
+## Contract quality
+
+- Use clear custom errors or meaningful revert messages.
+- Follow checks-effects-interactions where applicable.
+- Use events for every important state change.
+- Validate all user-provided inputs.
+- Avoid unnecessary storage and gas costs.
+- Consider duplicate-attestation and spam policies.
+- Make revocation and reputation calculations explicit.
+- Add automated tests for valid attestations, invalid scores, invalid subjects, unauthorized revocation, duplicate behavior if implemented, and successful revocation.
+- Document the contract's trust model and limitations.
+
+Do not claim the contract is audited. Keep the initial implementation suitable for testnet experimentation and clearly identify anything that needs an audit before production.
+
+# 4. CONNECT THE FRONTEND TO THE REAL CONTRACT
+
+Inspect the existing `src/App.tsx` and relevant components before changing them.
+
+Replace fake or incomplete on-chain behavior with actual smart-contract calls.
+
+The current implementation may use a wallet self-transaction with encoded text as a substitute for an attestation. Remove that approach. A transaction hash alone is not proof that a TrustGraph attestation was created.
+
+Implement a reusable contract interaction layer that:
+
+1. Connects to the user's wallet.
+2. Confirms the active chain is `46630`.
+3. Loads the deployed TrustGraph registry address from configuration.
+4. Instantiates the registry using its ABI.
+5. Submits an actual attestation transaction.
+6. Shows transaction-pending feedback.
+7. Waits for the transaction receipt.
+8. Checks that the transaction succeeded.
+9. Reads the emitted attestation event or resulting on-chain record.
+10. Displays the real transaction hash and attestation ID.
+11. Links to the Robinhood Chain Testnet block explorer.
+12. Refreshes the relevant entity profile, trust graph, and reputation information.
+
+If the contract has not been deployed or configured, display a clear setup message. Never pretend that a transaction succeeded.
+
+## Attestation experience
+
+Provide a polished attestation interface where users can:
+
+- Select or enter an entity.
+- Choose a trust score from 1 to 5.
+- Add an optional explanation.
+- Review the information before signing.
+- Submit the transaction through their wallet.
+- See a pending, confirmed, failed, or rejected state.
+- Open the confirmed transaction in the block explorer.
+- View the attestation in the entity's activity history.
+
+Show estimated network fees only when reliable fee data is available. Do not invent gas estimates or transaction confirmations.
+
+# 5. BUILD A REAL BACKEND VERIFICATION AND INDEXING LAYER
+
+Inspect `server.ts`, `server/db.ts`, `server/sync.ts`, and all existing API routes.
+
+Preserve the existing Express backend unless there is a compelling architectural reason to change it.
+
+Add a Robinhood Chain integration layer, preferably organized as:
+
+```text
+server/
+  robinhood/
+    client.ts
+    registry.ts
+    indexer.ts
+    verification.ts
+```
+
+Implement the following:
+
+- Connect to Robinhood Chain Testnet using a configurable RPC URL.
+- Read the deployed contract's events and public state.
+- Verify receipts and emitted events before classifying attestations as on-chain verified.
+- Confirm the transaction's chain, contract address, event parameters, attester, score, subject, and attestation ID.
+- Store transaction hashes, block numbers, log indexes, contract addresses, and chain IDs.
+- Make event processing idempotent so repeated syncs do not create duplicate records.
+- Track the last processed block.
+- Handle RPC errors and rate limits.
+- Design for chain reorganizations and recheck confirmations where appropriate.
+- Expose API routes for synchronizing attestations and checking transaction status.
+- Never accept a client-provided `verified: true` flag as proof of verification.
+- Never mark an attestation verified merely because the user supplied a transaction hash.
+- Verify the actual chain receipt and the expected registry event.
+
+Add a suitable database migration or backward-compatible data-model update for existing records.
+
+The current JSON database may remain usable for local development, but structure persistence behind a clean interface so a production database can be introduced later.
+
+Do not wipe the existing database or sample data during upgrades.
+
+# 6. REPAIR THE EXISTING TELEGRAM BOT
+
+Preserve the existing Telegram bot and useful commands.
+
+Review the current bot implementation in `server.ts`.
+
+Remove all simulated blockchain transactions, random transaction hashes, fake block numbers, and false confirmation messages.
+
+A Telegram message must never say that an attestation was confirmed on-chain unless the backend verified the actual transaction and registry event.
+
+Keep or improve relevant commands such as:
+
+- `/start` — explain TrustGraph and how to get started.
+- `/trust` — display available trust and reputation information.
+- `/graph` — show graph information or a link to the dashboard.
+- `/entities` — browse available entities.
+- `/wallet` — show wallet-linking status.
+- `/activate` — support the existing activation-code flow.
+- `/attest` — guide the user through a real attestation workflow.
+- `/sync` — synchronize real Robinhood Chain data.
+
+Adapt the commands to the existing implementation rather than duplicating or breaking them.
+
+Where signing a transaction requires a browser wallet, guide the user to the dashboard to complete the transaction. Never collect seed phrases or private keys through Telegram.
+
+Ensure that Telegram responses distinguish between:
+
+- Verified on-chain attestations.
+- Off-chain community claims.
+- AI-generated analysis.
+- Unverified or pending transactions.
+
+Keep bot credentials in environment variables.
+
+# 7. IMPROVE WALLET LINKING AND AUTHENTICATION
+
+Review the existing activation-code and wallet-linking system.
+
+Implement secure wallet ownership verification where appropriate:
+
+1. The server generates a unique, short-lived nonce.
+2. The user signs a message containing the nonce, intended domain, and expiration.
+3. The server verifies the signature against the expected wallet address.
+4. The nonce is invalidated after successful use.
+5. The server prevents replay attacks.
+
+Use a standard wallet-signature message format where practical.
+
+Do not treat a wallet address submitted in an HTTP request as proof of ownership.
+
+Keep wallet linking separate from the user's on-chain attestation history.
+
+# 8. UPDATE THE TRUST AND REPUTATION MODEL
+
+Preserve the existing graph and reputation functionality, but make the source of every claim explicit.
+
+Support separate evidence categories:
+
+- Verified on-chain attestations.
+- Off-chain community attestations.
+- External protocol data.
+- AI-generated interpretations.
+- Unverified user-submitted claims.
+
+Do not combine these into one unexplained reputation number.
+
+Create a transparent reputation calculation that considers relevant factors such as:
+
+- The number of valid attestations.
+- The distribution of trust scores.
+- Whether an attestation has been revoked.
+- The reputation or history of attesters, if implemented and clearly documented.
+- The age of evidence, if time weighting is implemented.
+- The provenance and verification status of each data source.
+
+Avoid claiming that the system has Sybil resistance or identity verification unless those mechanisms actually exist.
+
+Show a reputation breakdown with explanatory tooltips and make clear that trust scores represent community signals, not guarantees of safety.
+
+Prevent AI-generated analysis from being represented as on-chain evidence.
+
+# 9. PRESERVE AND IMPROVE INTUITION INTEGRATION
+
+The existing project includes an Intuition synchronization path.
+
+Keep it as an optional external data source instead of silently removing it.
+
+Requirements:
+
+- Keep Intuition-specific logic isolated from Robinhood Chain registry logic.
+- Clearly label Intuition-sourced data.
+- Preserve existing environment variables and useful functionality.
+- Do not mislabel Intuition or Base data as Robinhood Chain data.
+- Do not silently replace failed external requests with fabricated production data.
+- If mock data is used in development, clearly label it as sample data.
+- Ensure the interface identifies the origin and verification status of imported records.
+
+Robinhood Chain should be the primary network for new TrustGraph on-chain attestations.
+
+# 10. FULL UI/UX REDESIGN — ROBINHOOD CHAIN-INSPIRED DESIGN
+
+Redesign the existing interface to feel like a premium, modern Web3 infrastructure and reputation platform.
+
+The design should be inspired by the **visual identity and product aesthetic associated with Robinhood and Robinhood Chain**, while maintaining a distinct TrustGraph brand.
+
+Do not simply copy Robinhood's website or use its logo as if TrustGraph were an official Robinhood product. TrustGraph must remain an independent project.
+
+## Colour palette
+
+Use a coherent palette built around Robinhood-style green, dark graphite, white, and restrained neutral surfaces.
+
+Suggested design tokens:
+
+```css
+:root {
+  --rh-green: #00C805;
+  --rh-green-hover: #00A804;
+  --rh-green-soft: #E8FBEA;
+
+  --tg-background: #F7F9F7;
+  --tg-surface: #FFFFFF;
+  --tg-surface-muted: #F0F3F0;
+
+  --tg-text: #111713;
+  --tg-text-secondary: #657067;
+  --tg-border: #DDE5DD;
+
+  --tg-dark: #101510;
+  --tg-dark-surface: #1A211B;
+
+  --tg-success: #00A86B;
+  --tg-warning: #D99A18;
+  --tg-danger: #D64545;
+}
+```
+
+Treat these as initial design tokens. Check contrast and refine them consistently throughout the interface.
+
+Use green as a distinctive accent for primary actions, active network indicators, verified states, and selected graph elements. Do not flood every screen with bright green.
+
+## Visual direction
+
+- Premium and minimalist.
+- Clean, spacious layouts.
+- Strong typography and clear information hierarchy.
+- Crisp borders and restrained shadows.
+- Subtle green highlights and gradients used sparingly.
+- Smooth but restrained transitions.
+- Modern data visualization.
+- Responsive layouts that work well on mobile and desktop.
+- A credible financial infrastructure aesthetic, not a generic crypto landing page.
+- Avoid excessive glassmorphism, excessive gradients, cartoon illustrations, oversized emojis, and clutter.
+- Avoid excessive animation that harms usability or performance.
+
+Use a consistent icon library already installed in the repository where possible. Avoid mixing unrelated icon styles.
+
+## Navigation and application layout
+
+Build on the existing application structure.
+
+Create or refine:
+
+- A clear top navigation bar with the TrustGraph identity.
+- A prominent Connect Wallet button.
+- A Robinhood Chain Testnet network indicator.
+- A dashboard overview.
+- A Trust Graph explorer.
+- Entity and wallet profiles.
+- Attestations and activity history.
+- Reputation analytics.
+- A settings or network information area where useful.
+
+Use an appropriate desktop sidebar or top navigation based on the existing application. On mobile, provide a compact and accessible navigation pattern.
+
+## Dashboard
+
+Design a polished dashboard featuring:
+
+- Total entities indexed.
+- Verified on-chain attestations.
+- Off-chain community attestations.
+- Active or connected wallets, only if accurately measured.
+- Network and indexer status.
+- Recent attestations.
+- Recent graph activity.
+- A concise trust and reputation overview.
+- Helpful empty states for a new deployment.
+
+Use real backend data where available.
+
+Do not invent metrics or display fake real-time network statistics. If data is not available, show a clear empty state or label the information as sample data.
+
+## Trust graph visualization
+
+Make the graph a central visual feature.
+
+Requirements:
+
+- Clearly distinguish entities and relationships.
+- Use restrained green highlights for verified relationships.
+- Use neutral styling for off-chain relationships.
+- Use a separate visual treatment for unverified or revoked attestations.
+- Include an understandable legend.
+- Support zooming, panning, and selecting nodes if the existing graph library allows it.
+- Show an entity detail panel when a node is selected.
+- Display relationship provenance and trust information.
+- Handle large or empty graphs gracefully.
+- Keep the graph usable on smaller screens.
+- Add loading, error, and empty states.
+
+Do not imply that a relationship is verified merely because two nodes are connected visually.
+
+## Entity profiles
+
+Each entity profile should display:
+
+- Entity identifier and display name.
+- Relevant wallet address, if available.
+- Reputation score with an explanation of how it was calculated.
+- Verified and off-chain evidence counts.
+- Recent attestations.
+- Attester information.
+- Revocation status.
+- Source and verification details.
+- A link to relevant blockchain transactions.
+
+Make it easy to submit a new attestation and inspect the underlying evidence.
+
+## Transaction feedback
+
+Create clear transaction states:
+
+- Wallet not connected.
+- Wrong network.
+- Ready to submit.
+- Awaiting wallet approval.
+- Transaction pending.
+- Transaction confirmed.
+- Transaction failed.
+- User rejected the request.
+- Contract not deployed.
+
+Use green for success, amber for pending or warning states, and red for errors. Include useful error messages instead of generic failure alerts.
+
+## Motion and interaction
+
+Add subtle, purposeful interactions:
+
+- Hover states.
+- Button feedback.
+- Small transitions between tabs and panels.
+- Lightweight graph selection animations.
+- Toast notifications for meaningful actions.
+- Skeleton loaders where appropriate.
+
+Respect reduced-motion preferences. Avoid animations that make data harder to read.
+
+## Responsive design and accessibility
+
+- Mobile-first responsive behavior.
+- Keyboard-accessible controls.
+- Visible focus indicators.
+- Semantic HTML.
+- Accessible form labels.
+- Sufficient text and interface contrast.
+- Screen-reader-friendly transaction statuses.
+- No critical information communicated by colour alone.
+
+Do not break existing routes or remove existing application functionality during the redesign.
+
+# 11. ENVIRONMENT CONFIGURATION
+
+Update `.env.example` without exposing actual secrets.
+
+Include appropriate settings such as:
+
+```dotenv
+NODE_ENV=development
+
+RH_CHAIN_ID=46630
+RH_RPC_URL=https://rpc.testnet.chain.robinhood.com
+RH_EXPLORER_URL=https://explorer.testnet.chain.robinhood.com
+RH_REGISTRY_ADDRESS=
+
+TELEGRAM_BOT_TOKEN=
+GEMINI_API_KEY=
+INTUITION_API_KEY=
+```
+
+Add any additional configuration genuinely required by the implementation, such as a database URL or RPC provider API key.
+
+Requirements:
+
+- Validate required environment variables at startup.
+- Explain which variables are required and which are optional.
+- Keep private keys out of frontend variables.
+- Never commit real secrets.
+- Do not use a server-side deployment private key for routine user attestations.
+- If a deployment key is needed, use it only through a secure local or CI environment and document the risks.
+
+# 12. SECURITY AND DATA VALIDATION
+
+Audit all relevant frontend and backend code as part of the upgrade.
+
+Implement appropriate protection against:
+
+- Invalid wallet addresses.
+- Invalid scores and malformed request bodies.
+- Forged verification claims.
+- Replay attacks in wallet linking.
+- Unauthorized record updates.
+- Duplicate event processing.
+- Telegram abuse and spam.
+- Excessive API requests.
+- Cross-origin misconfiguration.
+- Leaked secrets and private keys.
+- Untrusted AI output.
+- Accidental exposure of sensitive information.
+
+Review CORS configuration, request validation, error handling, and rate limiting. Do not use unrestricted wildcard CORS together with credentials in production.
+
+Keep API error messages useful without leaking stack traces, secrets, or internal implementation details.
+
+Use established validation libraries if one is already installed or if introducing one is justified.
+
+# 13. TESTING AND QUALITY ASSURANCE
+
+Do not stop after generating code.
+
+Run the available checks and fix issues where possible.
+
+At minimum:
+
+- Install or verify dependencies.
+- Run the frontend build.
+- Run TypeScript checks if configured.
+- Run backend tests or start-up checks.
+- Compile the smart contract.
+- Run smart contract unit tests.
+- Test the network configuration.
+- Test wallet connection and network switching where feasible.
+- Test attestation submission and revocation.
+- Test receipt and event verification.
+- Test duplicate indexer processing.
+- Test invalid inputs and unauthorized requests.
+- Test Telegram behavior so it cannot report fabricated confirmations.
+- Test responsive layouts at mobile and desktop widths.
+
+If an integration test requires a deployed contract, RPC credentials, a funded wallet, or a Telegram token, document that limitation and provide the exact steps required.
+
+Do not claim that tests passed unless you actually ran them.
+
+# 14. DEPLOYMENT AND DOCUMENTATION
+
+Create or update the README with:
+
+- What TrustGraph does.
+- How its architecture works.
+- How Robinhood Chain Testnet is configured.
+- How to install dependencies and start the app.
+- How to configure environment variables.
+- How to compile and test the smart contract.
+- How to deploy the contract to Robinhood Chain Testnet.
+- How to configure the deployed registry address.
+- How to test wallet connection and submit an attestation.
+- How the backend verifies and indexes events.
+- How to configure the Telegram bot.
+- How optional Intuition integration works.
+- Known limitations and security considerations.
+- How to verify transactions using the testnet explorer.
+
+Include the actual deployed contract address only after a real successful deployment. Do not invent an address.
+
+Provide deployment instructions that use the correct chain ID and RPC configuration. Never commit deployment private keys.
+
+# 15. IMPLEMENTATION ORDER
+
+Execute the work in this order:
+
+**Phase 1 — Repository assessment**
+- Inspect the codebase.
+- Identify existing functionality and integration problems.
+- Plan changes that preserve useful features.
+
+**Phase 2 — Contract and network foundation**
+- Configure Robinhood Chain Testnet.
+- Implement the registry contract.
+- Add contract tests and deployment scripts.
+
+**Phase 3 — Real frontend integration**
+- Implement wallet connection and network switching.
+- Connect the attestation interface to the contract.
+- Add real transaction lifecycle states.
+
+**Phase 4 — Backend verification and indexing**
+- Verify receipts and events.
+- Extend existing data models safely.
+- Implement idempotent synchronization and verification status.
+
+**Phase 5 — Reputation, graph, and Telegram**
+- Connect verified records to the graph and reputation model.
+- Repair Telegram flows.
+- Preserve optional Intuition functionality.
+
+**Phase 6 — Complete UI redesign**
+- Apply the Robinhood-inspired green and neutral palette.
+- Refine dashboard, graph, entity profiles, activity, and responsive navigation.
+- Ensure the interface reflects actual application state.
+
+**Phase 7 — Security and QA**
+- Test contracts, APIs, wallet flows, and the UI.
+- Fix errors and document any remaining limitations.
+
+# 16. FINAL ACCEPTANCE CRITERIA
+
+The work is complete only when:
+
+1. The existing repository has been upgraded rather than replaced with a disconnected project.
+2. Robinhood Chain Testnet is configured as the primary target network.
+3. The smart contract compiles and has meaningful tests.
+4. The frontend can submit a real attestation to a deployed registry when configured and funded.
+5. Successful attestations are verified through actual blockchain evidence.
+6. Revocation is supported and reflected in the UI and reputation calculations.
+7. The backend does not trust client-submitted verification flags.
+8. The Telegram bot never fabricates transaction hashes or confirmations.
+9. The existing graph, AI explanations, wallet linking, and useful integrations are preserved.
+10. Intuition data remains clearly identified as a separate source.
+11. The interface uses a consistent Robinhood Chain-inspired green, white, and graphite visual system.
+12. The product works responsively on desktop and mobile.
+13. Loading, error, empty, pending, and success states are handled properly.
+14. Existing data is preserved and any schema changes are backward-compatible.
+15. Documentation explains setup, deployment, testing, and security limitations.
+16. The final report distinguishes implemented and tested functionality from anything that still requires credentials, deployment, or manual verification.
+
+## Critical working rules
+
+- Make actual code changes in the repository; do not return only a proposal.
+- Inspect files before editing.
+- Reuse the existing architecture and dependencies when reasonable.
+- Do not remove features simply because they are inconvenient to integrate.
+- Do not fabricate transactions, metrics, wallet balances, network activity, or deployment results.
+- Do not treat an ordinary wallet transaction as a verified TrustGraph attestation.
+- Do not hardcode private keys, credentials, or secrets.
+- Do not claim deployment, testing, or security auditing that did not happen.
+- Do not leave important buttons as decorative placeholders.
+- If something cannot be completed because credentials, RPC access, or a deployment is missing, implement what can be completed, explain the blocker, and give the exact next steps.
+
+At the end, provide a concise engineering report listing:
+- Files created.
+- Files updated.
+- Important architectural decisions.
+- Smart contract functionality.
+- UI changes.
+- Tests actually run and their results.
+- Environment variables required.
+- Deployment steps still needed.
+- Any known limitations.
+
+**Start by inspecting the repository, then implement the upgrade end-to-end.**

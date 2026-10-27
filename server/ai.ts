@@ -1,5 +1,5 @@
-import { GoogleGenAI } from "@google/genai";
-import { db } from "./db";
+import { GoogleGenAI, Type } from '@google/genai';
+import { db } from './db';
 
 export interface AIExplanationResult {
   entityName: string;
@@ -8,6 +8,10 @@ export interface AIExplanationResult {
   confidenceLevel: 'Low' | 'Medium' | 'High';
   trustScore: number;
   totalClaims: number;
+  verifiedOnChainCount: number;
+  sourceType: 'ai_interpretation' | 'deterministic_heuristic';
+  isOnChainEvidence: false;
+  disclaimer: string;
 }
 
 let aiClient: GoogleGenAI | null = null;
@@ -15,22 +19,19 @@ let aiClient: GoogleGenAI | null = null;
 export function getAiClient(): GoogleGenAI | null {
   if (!aiClient) {
     const key = process.env.GEMINI_API_KEY;
-    if (key && key !== 'MY_GEMINI_API_KEY') {
+    if (key && key !== 'MY_GEMINI_API_KEY' && key.trim().length > 0) {
       try {
         aiClient = new GoogleGenAI({
-          apiKey: key,
+          apiKey: key.trim(),
           httpOptions: {
             headers: {
               'User-Agent': 'aistudio-build',
-            }
-          }
+            },
+          },
         });
-        console.log('[AI-Service] Gemini Client successfully initialized with key.');
       } catch (err) {
         console.error('[AI-Service] Error initializing Gemini client:', err);
       }
-    } else {
-      console.log('[AI-Service] GEMINI_API_KEY not set. Using local heuristic fallback generator.');
     }
   }
   return aiClient;
@@ -39,62 +40,100 @@ export function getAiClient(): GoogleGenAI | null {
 interface CacheEntry {
   result: AIExplanationResult;
   count: number;
+  verifiedCount: number;
   average: number;
 }
 
 const explanationCache = new Map<string, CacheEntry>();
 let lastRateLimitTimestamp = 0;
-const RATE_LIMIT_COOLDOWN_MS = 60 * 1000; // 60 seconds cooldown after 429
+const RATE_LIMIT_COOLDOWN_MS = 60 * 1000;
+
+const AI_DISCLAIMER =
+  'Off-chain AI interpretation generated from available evidence. AI summaries are analytical aids, never on-chain proof or financial guarantees.';
 
 export async function explainTrust(entityName: string): Promise<AIExplanationResult> {
   const stats = db.getEntityStats(entityName);
   const atom = db.findAtom(entityName);
-  
+
   const displayName = atom ? atom.displayName : entityName;
   const trustScore = stats.average;
   const totalClaims = stats.count;
+  const verifiedOnChainCount = stats.verifiedOnChainCount;
 
-  // Serve from cache if the entity's attestation count & average score are identical to cached values
   const cacheKey = entityName.toLowerCase().trim();
   const cached = explanationCache.get(cacheKey);
-  if (cached && cached.count === totalClaims && cached.average === trustScore) {
+  if (
+    cached &&
+    cached.count === totalClaims &&
+    cached.verifiedCount === verifiedOnChainCount &&
+    cached.average === trustScore
+  ) {
     return cached.result;
   }
 
-  // Compile prompt context
-  const attestationData = stats.list.map(a => `- Rating: ${a.trust_score}/5 by @${a.from_user}: "${a.comment}"`).join('\n');
+  const activeRecords = stats.list.filter(
+    (a) => !a.revoked && a.evidence_category !== 'external_intuition_sample'
+  );
+
+  const attestationData = activeRecords
+    .slice(-15)
+    .map(
+      (a) =>
+        `- [${a.evidence_category}] Score ${a.trust_score}/5 by ${a.wallet_address || `@${a.from_user}`}: "${(a.comment || '').slice(0, 200)}"`
+    )
+    .join('\n');
 
   const riskSignalsHeuristic: string[] = [];
-  if (trustScore < 3) {
-    riskSignalsHeuristic.push('Low overall feedback score implies active trust concerns in the community.');
-  }
-  if (totalClaims < 3) {
-    riskSignalsHeuristic.push('Very low participation level limits statistical reputation consensus.');
-  }
-  const scoreVariance = stats.list.length > 1 ? 
-    Math.max(...stats.list.map(a => a.trust_score)) - Math.min(...stats.list.map(a => a.trust_score)) : 0;
-  if (scoreVariance >= 3) {
-    riskSignalsHeuristic.push('Polarized ratings indicate divided stakeholder trust circles.');
+  if (totalClaims === 0) {
+    riskSignalsHeuristic.push('No active attestations exist for this entity yet.');
+  } else {
+    if (verifiedOnChainCount === 0) {
+      riskSignalsHeuristic.push(
+        'All current claims are off-chain; zero verified Robinhood Chain registry attestations exist yet.'
+      );
+    }
+    if (trustScore > 0 && trustScore < 3) {
+      riskSignalsHeuristic.push('Composite trust rating is below 3.0/5, signaling negative community feedback.');
+    }
+    if (totalClaims < 3) {
+      riskSignalsHeuristic.push('Small contributor sample size (< 3 attestations) limits statistical confidence.');
+    }
+    if (stats.revokedCount > 0) {
+      riskSignalsHeuristic.push(`${stats.revokedCount} prior attestation(s) were revoked or superseded.`);
+    }
+    const scoreVariance =
+      activeRecords.length > 1
+        ? Math.max(...activeRecords.map((a) => a.trust_score)) -
+          Math.min(...activeRecords.map((a) => a.trust_score))
+        : 0;
+    if (scoreVariance >= 3) {
+      riskSignalsHeuristic.push('High score dispersion (>= 3 points) indicates polarized contributor assessments.');
+    }
   }
 
-  // Determine heuristic confidence level
   let confidence: 'Low' | 'Medium' | 'High' = 'Low';
-  if (totalClaims >= 5) confidence = 'High';
-  else if (totalClaims >= 3) confidence = 'Medium';
+  if (verifiedOnChainCount >= 2 && totalClaims >= 4) confidence = 'High';
+  else if (totalClaims >= 3 || verifiedOnChainCount >= 1) confidence = 'Medium';
 
-  const summaryHeuristic = `Based on ${totalClaims} community attestation${totalClaims === 1 ? '' : 's'}, ${displayName} maintains an average trust rating of ${trustScore}/5. ${
-    trustScore >= 4 ? 'The consensus is highly favorable, highlighting active reliability and positive stakeholder relationships.' :
-    trustScore >= 3 ? 'The entity displays stable reputation signals with moderate trust scores but is subject to occasional critical reviews.' :
-    'Reputation signals reflect severe trust concerns or negative feedback that requires caution.'
-  }`;
+  const summaryHeuristic =
+    totalClaims === 0
+      ? `${displayName} has no active attestations yet. Submit a verified Robinhood Chain attestation to establish initial provenance.`
+      : `Across ${totalClaims} active record${totalClaims === 1 ? '' : 's'} (${verifiedOnChainCount} verified on Robinhood Chain, ${stats.offChainCount} off-chain), ${displayName} holds a provenance-weighted score of ${trustScore}/5.`;
 
   const defaultResult: AIExplanationResult = {
     entityName: displayName,
     summary: summaryHeuristic,
-    riskSignals: riskSignalsHeuristic.length > 0 ? riskSignalsHeuristic : ['No critical risk signals flagged by the community.'],
+    riskSignals:
+      riskSignalsHeuristic.length > 0
+        ? riskSignalsHeuristic
+        : ['Evidence includes verified signals with consistent contributor ratings.'],
     confidenceLevel: confidence,
     trustScore,
-    totalClaims
+    totalClaims,
+    verifiedOnChainCount,
+    sourceType: 'deterministic_heuristic',
+    isOnChainEvidence: false,
+    disclaimer: AI_DISCLAIMER,
   };
 
   const ai = getAiClient();
@@ -102,70 +141,101 @@ export async function explainTrust(entityName: string): Promise<AIExplanationRes
     return defaultResult;
   }
 
-  // If rate limit was hit recently, bypass calling the live API to conserve quota
-  const now = Date.now();
-  if (now - lastRateLimitTimestamp < RATE_LIMIT_COOLDOWN_MS) {
+  if (Date.now() - lastRateLimitTimestamp < RATE_LIMIT_COOLDOWN_MS) {
     return defaultResult;
   }
 
   try {
-    const prompt = `
-You are the TrustGraph AI Analyst (inspired by Intuition reputation standards).
-Analyze this trust data and explain whether this entity is trustworthy. Be extremely concise, objective, and factual.
-
-Entity Name: ${displayName}
-Type: ${atom ? atom.type : 'Unknown'}
-Average Trust Score (out of 5): ${trustScore}
-Total Community Attestations: ${totalClaims}
-
-Raw Attestations Table:
-${attestationData || 'No attestation feedback exists yet. It is a newly registered Atom identity.'}
-
-Please return the analysis strictly formatted as a JSON object matching this TypeScript structure:
-{
-  "summary": "Concise paragraph summarizing the trust consensus and feedback theme",
-  "riskSignals": ["bullet 1 about issues or warnings", "bullet 2"],
-  "confidenceLevel": "Low" | "Medium" | "High"
-}
-
-Provide ONLY the valid JSON block without markdown formatting or other explanations.
-`;
+    const prompt = [
+      'Analyze the following TrustGraph reputation dataset objectively and concisely.',
+      'Distinguish clearly between verified on-chain Robinhood Chain attestations and unverified off-chain claims.',
+      'Never claim on-chain verification if verifiedOnChainCount is 0, and never guarantee financial safety.',
+      '',
+      `Entity Name: ${displayName}`,
+      `Entity Class: ${atom ? atom.type : 'unknown'}`,
+      `Provenance-Weighted Score (out of 5): ${trustScore}`,
+      `Active Evidence Count: ${totalClaims}`,
+      `Verified On-Chain Attestations (Robinhood Chain): ${verifiedOnChainCount}`,
+      `Revoked/Superseded Count: ${stats.revokedCount}`,
+      '',
+      'Active Evidence Records:',
+      attestationData || 'None.',
+    ].join('\n');
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: 'gemini-3.8-flash',
       contents: prompt,
       config: {
-        responseMimeType: "application/json",
-      }
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            summary: {
+              type: Type.STRING,
+              description: 'Objective 2-sentence summary citing verified vs off-chain evidence counts.',
+            },
+            riskSignals: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: '1 to 3 concrete risk or data-quality observations.',
+            },
+            confidenceLevel: {
+              type: Type.STRING,
+              description: 'Low, Medium, or High based on verified evidence volume.',
+            },
+          },
+          required: ['summary', 'riskSignals', 'confidenceLevel'],
+        },
+      },
     });
 
-    const contentText = response.text || '';
-    if (contentText.trim()) {
-      const result = JSON.parse(contentText.trim());
+    const contentText = (response.text || '').trim();
+    if (contentText) {
+      const parsed = JSON.parse(contentText);
+      const validConf: 'Low' | 'Medium' | 'High' =
+        parsed.confidenceLevel === 'High' || parsed.confidenceLevel === 'Medium'
+          ? parsed.confidenceLevel
+          : 'Low';
+
+      const sanitizedRisks = Array.isArray(parsed.riskSignals)
+        ? parsed.riskSignals
+            .map((s: any) => String(s || '').trim().slice(0, 240))
+            .filter(Boolean)
+            .slice(0, 4)
+        : defaultResult.riskSignals;
+
       const finalizedResult: AIExplanationResult = {
         entityName: displayName,
-        summary: result.summary || defaultResult.summary,
-        riskSignals: result.riskSignals && result.riskSignals.length > 0 ? result.riskSignals : defaultResult.riskSignals,
-        confidenceLevel: result.confidenceLevel || defaultResult.confidenceLevel,
+        summary: String(parsed.summary || defaultResult.summary).trim().slice(0, 600),
+        riskSignals: sanitizedRisks.length > 0 ? sanitizedRisks : defaultResult.riskSignals,
+        confidenceLevel: validConf,
         trustScore,
-        totalClaims
+        totalClaims,
+        verifiedOnChainCount,
+        sourceType: 'ai_interpretation',
+        isOnChainEvidence: false,
+        disclaimer: AI_DISCLAIMER,
       };
 
       explanationCache.set(cacheKey, {
         result: finalizedResult,
         count: totalClaims,
-        average: trustScore
+        verifiedCount: verifiedOnChainCount,
+        average: trustScore,
       });
 
       return finalizedResult;
     }
   } catch (err: any) {
-    const isRateLimit = err && (err.status === 429 || String(err).includes('429') || String(err).includes('RESOURCE_EXHAUSTED'));
+    const isRateLimit =
+      err &&
+      (err.status === 429 ||
+        String(err).includes('429') ||
+        String(err).includes('RESOURCE_EXHAUSTED'));
     if (isRateLimit) {
       lastRateLimitTimestamp = Date.now();
-      console.warn('[AI-Service] Gemini API quota limit reached (429/RESOURCE_EXHAUSTED). Backing off live API queries for 60s and utilizing local heuristics.');
     } else {
-      console.warn('[AI-Service] Gemini generation or parsing failed, falling back to heuristics:', err?.message || err);
+      console.warn('[AI-Service] Gemini analysis fallback to deterministic heuristics:', err?.message || err);
     }
   }
 

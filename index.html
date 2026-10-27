@@ -3,18 +3,31 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>TrustGraph Reputation & Trust Workspace</title>
+    <title>TrustGraph Bot</title>
+    <meta
+      name="description"
+      content="A decentralized trust and reputation system mapping relationships and signals through a Telegram Bot and visual workspace."
+    />
+    <meta property="og:title" content="TrustGraph Bot" />
+    <meta
+      property="og:description"
+      content="A decentralized trust and reputation system mapping relationships and signals through a Telegram Bot and visual workspace."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700&family=Public+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
     <script>
-      (function() {
-        // Intercept Object.defineProperty to handle safe-guarding and preventing
-        // "Cannot redefine property: ethereum" errors in standard web3 injection cases.
+      (function () {
         const originalDefineProperty = Object.defineProperty;
-        Object.defineProperty = function(obj, prop, descriptor) {
+        Object.defineProperty = function (obj, prop, descriptor) {
           if (prop === 'ethereum' && (obj === window || obj === globalThis)) {
             try {
               return originalDefineProperty.apply(this, arguments);
             } catch (err) {
-              console.warn("[Reputation-Guard] Prevented crash during window.ethereum definition. Error handled:", err.message);
+              console.warn('[Wallet-Guard] Handled duplicate window.ethereum injection:', err.message);
               return obj;
             }
           }
@@ -23,9 +36,8 @@
       })();
     </script>
   </head>
-  <body>
+  <body class="bg-[#F7F9F7] text-[#111713] antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-
