@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <rect width="64" height="64" rx="14" fill="#0C100C" />
+  <polygon
+    points="32,11 50,21.5 50,42.5 32,53 14,42.5 14,21.5"
+    stroke="#CCFF00"
+    stroke-width="5.2"
+    stroke-linejoin="miter"
+  />
+  <line x1="32" y1="12" x2="32" y2="32" stroke="#CCFF00" stroke-width="5.2" />
+  <line x1="15" y1="42" x2="32" y2="32" stroke="#CCFF00" stroke-width="5.2" />
+  <line x1="49" y1="42" x2="32" y2="32" stroke="#CCFF00" stroke-width="5.2" />
+  <polygon points="32,5.5 38,9 38,16 32,19.5 26,16 26,9" fill="#CCFF00" />
+  <polygon points="14,36 20,39.5 20,46.5 14,50 8,46.5 8,39.5" fill="#CCFF00" />
+  <polygon points="50,36 56,39.5 56,46.5 50,50 44,46.5 44,39.5" fill="#CCFF00" />
+  <polygon points="32,27.8 35.8,30 35.8,34.2 32,36.4 28.2,34.2 28.2,30" fill="#FFFFFF" />
+</svg>

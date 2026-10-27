@@ -11,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import { AttestationPanel } from './components/AttestationPanel';
+import { BrandLogo } from './components/BrandLogo';
 import { EntityProfileView } from './components/EntityProfileView';
 import { LandingPage, WorkspaceEntryTarget } from './components/LandingPage';
 import { NetworkAndBotView } from './components/NetworkAndBotView';
@@ -450,7 +451,7 @@ export function App() {
       {/* Strict 3-Zone Obsidian Top Bar */}
       <header className="sticky top-0 z-30 bg-[#0C100C] border-b border-white/10">
         <div className="max-w-[1320px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-8">
-          {/* Zone 1: Single-Line Brand Wordmark (Returns to Landing Walkthrough) */}
+          {/* Zone 1: Single-Line Brand Lockup (Returns to Landing Walkthrough) */}
           <button
             type="button"
             onClick={() => {
@@ -459,9 +460,9 @@ export function App() {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }
             }}
-            className="text-lg font-bold tracking-tight text-white font-display whitespace-nowrap shrink-0 cursor-pointer"
+            className="inline-flex items-center whitespace-nowrap shrink-0 cursor-pointer rounded-lg"
           >
-            TrustGraph
+            <BrandLogo theme="dark" size="md" />
           </button>
 
           {/* Zone 2: 5 Concise Single-Line Workspace Links */}
@@ -1418,10 +1419,15 @@ export function App() {
 
       {/* Quiet Footer */}
       <footer className="bg-white border-t border-[#DCE3DC] mt-12">
-        <div className="max-w-[1320px] mx-auto px-4 sm:px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs text-[#535E54]">
-          <div>
-            TrustGraph — Independent Open-Source Reputation Protocol on Robinhood Chain Testnet
-            (46630).
+        <div className="max-w-[1320px] mx-auto px-4 sm:px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-xs text-[#535E54]">
+          <div className="flex flex-wrap items-center gap-3">
+            <BrandLogo theme="light" size="sm" />
+            <span aria-hidden="true" className="hidden sm:inline text-[#DCE3DC]">
+              ·
+            </span>
+            <span>
+              Independent Open-Source Reputation Protocol on Robinhood Chain Testnet (46630).
+            </span>
           </div>
           <div className="flex flex-wrap items-center gap-4">
             <button

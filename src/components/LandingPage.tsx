@@ -4,6 +4,7 @@ import heroSculptureImg from '../assets/images/hero_trust_sculpture_179306731969
 import provenanceLayersImg from '../assets/images/provenance_glass_layers_1793067320166.jpg';
 import { ROBINHOOD_TESTNET, computeSubjectId, shortenAddress } from '../lib/robinhoodChain';
 import { Atom, GlobalStats, RobinhoodNetworkStatus } from '../types';
+import { BrandLogo } from './BrandLogo';
 
 export type WorkspaceEntryTarget = 'overview' | 'graph' | 'entities' | 'activity' | 'network';
 
@@ -122,12 +123,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* Strict 3-Zone Top Bar Contract */}
       <header className="sticky top-0 z-30 bg-[#0C100C] border-b border-white/10">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-8">
-          {/* Zone 1: Single-line Brand Wordmark */}
+          {/* Zone 1: Single-line Brand Lockup */}
           <a
             href="#top"
-            className="text-lg font-bold tracking-tight text-white font-display whitespace-nowrap shrink-0"
+            className="inline-flex items-center whitespace-nowrap shrink-0 rounded-lg"
           >
-            TrustGraph
+            <BrandLogo theme="dark" size="md" />
           </a>
 
           {/* Zone 2: 4 Concise Single-Line Navigation Links */}
@@ -862,10 +863,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
       {/* Quiet Footer */}
       <footer className="bg-[#0C100C] border-t border-white/10 text-[#859286]">
-        <div className="max-w-[1280px] mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
-          <div>
-            TrustGraph — Independent Open-Source Reputation Protocol on Robinhood Chain Testnet
-            (46630). Unaudited testnet contract.
+        <div className="max-w-[1280px] mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-xs">
+          <div className="flex flex-wrap items-center gap-3">
+            <BrandLogo theme="dark" size="sm" />
+            <span aria-hidden="true" className="hidden sm:inline text-white/20">
+              ·
+            </span>
+            <span>
+              Independent Open-Source Reputation Protocol on Robinhood Chain Testnet (46630).
+              Unaudited testnet contract.
+            </span>
           </div>
           <div className="flex flex-wrap items-center gap-5">
             <button
